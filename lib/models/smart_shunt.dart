@@ -1,4 +1,5 @@
 // lib/models/smart_shunt.dart
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 class SmartShunt {
   final double batteryVoltage;
@@ -45,8 +46,6 @@ class SmartShunt {
     return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated)';
   }
 }
-
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 const String AE_SMART_SHUNT_DEVICE_NAME = 'AE Smart Shunt';
 
