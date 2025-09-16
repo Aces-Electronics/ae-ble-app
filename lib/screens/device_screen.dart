@@ -40,23 +40,47 @@ class _DeviceScreenState extends State<DeviceScreen> {
         builder: (context, snapshot) {
           if (snapshot.hasData) {
             final smartShunt = snapshot.data!;
-            return ListView(
+            return GridView.count(
               padding: const EdgeInsets.all(16.0),
+              crossAxisCount: 2,
+              crossAxisSpacing: 16.0,
+              mainAxisSpacing: 16.0,
               children: [
-                _buildInfoTile('Battery Voltage',
-                    '${smartShunt.batteryVoltage.toStringAsFixed(2)} V'),
-                _buildInfoTile('Battery Current',
-                    '${smartShunt.batteryCurrent.toStringAsFixed(2)} A'),
-                _buildInfoTile('Battery Power',
-                    '${smartShunt.batteryPower.toStringAsFixed(2)} W'),
-                _buildInfoTile('State of Charge (SOC)',
-                    '${(smartShunt.soc * 100).toStringAsFixed(1)} %'),
-                _buildInfoTile('Remaining Capacity',
-                    '${smartShunt.remainingCapacity.toStringAsFixed(2)} Ah'),
-                _buildInfoTile('Starter Battery Voltage',
-                    '${smartShunt.starterBatteryVoltage.toStringAsFixed(2)} V'),
-                _buildInfoTile('Calibration Status',
-                    smartShunt.isCalibrated ? 'Calibrated' : 'Not Calibrated'),
+                _buildInfoTile(
+                    context,
+                    'Battery Voltage',
+                    '${smartShunt.batteryVoltage.toStringAsFixed(2)} V',
+                    Icons.battery_charging_full),
+                _buildInfoTile(
+                    context,
+                    'Battery Current',
+                    '${smartShunt.batteryCurrent.toStringAsFixed(2)} A',
+                    Icons.flash_on),
+                _buildInfoTile(
+                    context,
+                    'Battery Power',
+                    '${smartShunt.batteryPower.toStringAsFixed(2)} W',
+                    Icons.power),
+                _buildInfoTile(
+                    context,
+                    'State of Charge (SOC)',
+                    '${(smartShunt.soc * 100).toStringAsFixed(1)} %',
+                    Icons.battery_std),
+                _buildInfoTile(
+                    context,
+                    'Remaining Capacity',
+                    '${smartShunt.remainingCapacity.toStringAsFixed(2)} Ah',
+                    Icons.battery_saver),
+                _buildInfoTile(
+                    context,
+                    'Starter Battery Voltage',
+                    '${smartShunt.starterBatteryVoltage.toStringAsFixed(2)} V',
+                    Icons.battery_alert),
+                _buildInfoTile(
+                    context,
+                    'Calibration Status',
+                    smartShunt.isCalibrated ? 'Calibrated' : 'Not Calibrated',
+                    Icons.settings),
               ],
             );
           } else {
@@ -69,13 +93,32 @@ class _DeviceScreenState extends State<DeviceScreen> {
     );
   }
 
-  Widget _buildInfoTile(String title, String value) {
+  Widget _buildInfoTile(
+      BuildContext context, String title, String value, IconData icon) {
+    final theme = Theme.of(context);
     return Card(
-      child: ListTile(
-        title: Text(title),
-        trailing: Text(
-          value,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 40, color: theme.colorScheme.primary),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
       ),
     );
