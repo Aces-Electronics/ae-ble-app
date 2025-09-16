@@ -41,10 +41,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
           if (snapshot.hasData) {
             final smartShunt = snapshot.data!;
             return GridView.count(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(8.0),
               crossAxisCount: 2,
-              crossAxisSpacing: 16.0,
-              mainAxisSpacing: 16.0,
+              crossAxisSpacing: 8.0,
+              mainAxisSpacing: 8.0,
+              childAspectRatio: 1.2,
               children: [
                 _buildInfoTile(
                     context,
@@ -81,6 +82,20 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     'Calibration Status',
                     smartShunt.isCalibrated ? 'Calibrated' : 'Not Calibrated',
                     Icons.settings),
+                _buildInfoTile(
+                    context,
+                    'Error State',
+                    _getErrorStateString(smartShunt.errorState),
+                    Icons.error_outline),
+                _buildControlTile(
+                  context,
+                  'Load State',
+                  smartShunt.loadState,
+                  Icons.power_settings_new,
+                  (bool value) {
+                    _bleService.setLoadState(value);
+                  },
+                ),
               ],
             );
           } else {
@@ -93,30 +108,74 @@ class _DeviceScreenState extends State<DeviceScreen> {
     );
   }
 
+  String _getErrorStateString(ErrorState errorState) {
+    switch (errorState) {
+      case ErrorState.normal:
+        return 'Normal';
+      case ErrorState.warning:
+        return 'Warning';
+      case ErrorState.critical:
+        return 'Critical';
+      case ErrorState.overflow:
+        return 'Overflow';
+      case ErrorState.notCalibrated:
+        return 'Not Calibrated';
+    }
+  }
+
   Widget _buildInfoTile(
       BuildContext context, String title, String value, IconData icon) {
     final theme = Theme.of(context);
     return Card(
-      elevation: 4,
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(8.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 40, color: theme.colorScheme.primary),
+            Icon(icon, size: 32, color: theme.colorScheme.primary),
             const SizedBox(height: 8),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: theme.textTheme.titleMedium,
+              style: theme.textTheme.titleSmall,
             ),
             const SizedBox(height: 4),
             Text(
               value,
               textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall
+              style: theme.textTheme.titleLarge
                   ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildControlTile(BuildContext context, String title, bool value,
+      IconData icon, ValueChanged<bool> onChanged) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 32, color: theme.colorScheme.primary),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            Switch(
+              value: value,
+              onChanged: onChanged,
             ),
           ],
         ),

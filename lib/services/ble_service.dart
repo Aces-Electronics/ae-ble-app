@@ -10,6 +10,7 @@ class BleService {
   Stream<SmartShunt> get smartShuntStream => _smartShuntController.stream;
 
   SmartShunt _currentSmartShunt = SmartShunt();
+  BluetoothDevice? _device;
 
   void dispose() {
     _smartShuntController.close();
@@ -29,6 +30,7 @@ class BleService {
   }
 
   Future<void> connectToDevice(BluetoothDevice device) async {
+    _device = device;
     await device.connect();
     discoverServices(device);
   }
@@ -38,10 +40,28 @@ class BleService {
     for (BluetoothService service in services) {
       if (service.uuid == SMART_SHUNT_SERVICE_UUID) {
         for (BluetoothCharacteristic characteristic in service.characteristics) {
-          await characteristic.setNotifyValue(true);
-          characteristic.lastValueStream.listen((value) {
-            _updateSmartShuntData(characteristic.uuid, value);
-          });
+          if (characteristic.properties.read ||
+              characteristic.properties.notify) {
+            await characteristic.setNotifyValue(true);
+            characteristic.lastValueStream.listen((value) {
+              _updateSmartShuntData(characteristic.uuid, value);
+            });
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> setLoadState(bool enabled) async {
+    if (_device == null) return;
+    List<BluetoothService> services = await _device!.discoverServices();
+    for (BluetoothService service in services) {
+      if (service.uuid == SMART_SHUNT_SERVICE_UUID) {
+        for (BluetoothCharacteristic characteristic in service.characteristics) {
+          if (characteristic.uuid == LOAD_CONTROL_UUID) {
+            await characteristic.write([enabled ? 1 : 0]);
+            break;
+          }
         }
       }
     }
@@ -73,6 +93,12 @@ class BleService {
     } else if (characteristicUuid == CALIBRATION_STATUS_UUID) {
       _currentSmartShunt =
           _currentSmartShunt.copyWith(isCalibrated: value[0] == 1);
+    } else if (characteristicUuid == ERROR_STATE_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+          errorState: ErrorState.values[value[0]]);
+    } else if (characteristicUuid == LOAD_STATE_UUID) {
+      _currentSmartShunt =
+          _currentSmartShunt.copyWith(loadState: value[0] == 1);
     }
     _smartShuntController.add(_currentSmartShunt);
   }
