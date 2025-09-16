@@ -1,15 +1,16 @@
-# Companion App for Smart Shunt
+# ae_ble_app
 
-This directory will contain the source code for the Flutter-based companion app for the Smart Shunt project.
+A new Flutter project.
 
-The app will connect to the shunt via Bluetooth Low Energy (BLE) and display real-time telemetry data, such as:
+## Getting Started
 
-*   Battery Voltage
-*   Current
-*   Power
-*   State of Charge (SOC)
-*   Remaining Battery Capacity
-*   Starter Battery Voltage
-*   Calibration Status
+This project is a starting point for a Flutter application.
 
-The UI will be inspired by the Victron Connect app, providing a clean and user-friendly way to monitor the battery system.
+A few resources to get you started if this is your first Flutter project:
+
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
