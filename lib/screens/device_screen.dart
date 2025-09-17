@@ -35,75 +35,77 @@ class _DeviceScreenState extends State<DeviceScreen> {
       appBar: AppBar(
         title: Text(widget.device.platformName),
       ),
-      body: StreamBuilder<SmartShunt>(
-        stream: _bleService.smartShuntStream,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            final smartShunt = snapshot.data!;
-            return GridView.count(
-              padding: const EdgeInsets.all(8.0),
-              crossAxisCount: 2,
-              crossAxisSpacing: 8.0,
-              mainAxisSpacing: 8.0,
-              childAspectRatio: 1.2,
-              children: [
-                _buildInfoTile(
+      body: SafeArea(
+        child: StreamBuilder<SmartShunt>(
+          stream: _bleService.smartShuntStream,
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              final smartShunt = snapshot.data!;
+              return GridView.count(
+                padding: const EdgeInsets.all(8.0),
+                crossAxisCount: 2,
+                crossAxisSpacing: 8.0,
+                mainAxisSpacing: 8.0,
+                childAspectRatio: 1.2,
+                children: [
+                  _buildInfoTile(
+                      context,
+                      'Battery Voltage',
+                      '${smartShunt.batteryVoltage.toStringAsFixed(2)} V',
+                      Icons.battery_charging_full),
+                  _buildInfoTile(
+                      context,
+                      'Battery Current',
+                      '${smartShunt.batteryCurrent.toStringAsFixed(2)} A',
+                      Icons.flash_on),
+                  _buildInfoTile(
+                      context,
+                      'Battery Power',
+                      '${smartShunt.batteryPower.toStringAsFixed(2)} W',
+                      Icons.power),
+                  _buildInfoTile(
+                      context,
+                      'State of Charge (SOC)',
+                      '${(smartShunt.soc * 100).toStringAsFixed(1)} %',
+                      Icons.battery_std),
+                  _buildInfoTile(
+                      context,
+                      'Remaining Capacity',
+                      '${smartShunt.remainingCapacity.toStringAsFixed(2)} Ah',
+                      Icons.battery_saver),
+                  _buildInfoTile(
+                      context,
+                      'Starter Battery Voltage',
+                      '${smartShunt.starterBatteryVoltage.toStringAsFixed(2)} V',
+                      Icons.battery_alert),
+                  _buildInfoTile(
+                      context,
+                      'Calibration Status',
+                      smartShunt.isCalibrated ? 'Calibrated' : 'Not Calibrated',
+                      Icons.settings),
+                  _buildInfoTile(
+                      context,
+                      'Error State',
+                      _getErrorStateString(smartShunt.errorState),
+                      Icons.error_outline),
+                  _buildControlTile(
                     context,
-                    'Battery Voltage',
-                    '${smartShunt.batteryVoltage.toStringAsFixed(2)} V',
-                    Icons.battery_charging_full),
-                _buildInfoTile(
-                    context,
-                    'Battery Current',
-                    '${smartShunt.batteryCurrent.toStringAsFixed(2)} A',
-                    Icons.flash_on),
-                _buildInfoTile(
-                    context,
-                    'Battery Power',
-                    '${smartShunt.batteryPower.toStringAsFixed(2)} W',
-                    Icons.power),
-                _buildInfoTile(
-                    context,
-                    'State of Charge (SOC)',
-                    '${(smartShunt.soc * 100).toStringAsFixed(1)} %',
-                    Icons.battery_std),
-                _buildInfoTile(
-                    context,
-                    'Remaining Capacity',
-                    '${smartShunt.remainingCapacity.toStringAsFixed(2)} Ah',
-                    Icons.battery_saver),
-                _buildInfoTile(
-                    context,
-                    'Starter Battery Voltage',
-                    '${smartShunt.starterBatteryVoltage.toStringAsFixed(2)} V',
-                    Icons.battery_alert),
-                _buildInfoTile(
-                    context,
-                    'Calibration Status',
-                    smartShunt.isCalibrated ? 'Calibrated' : 'Not Calibrated',
-                    Icons.settings),
-                _buildInfoTile(
-                    context,
-                    'Error State',
-                    _getErrorStateString(smartShunt.errorState),
-                    Icons.error_outline),
-                _buildControlTile(
-                  context,
-                  'Load State',
-                  smartShunt.loadState,
-                  Icons.power_settings_new,
-                  (bool value) {
-                    _bleService.setLoadState(value);
-                  },
-                ),
-              ],
-            );
-          } else {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-        },
+                    'Load State',
+                    smartShunt.loadState,
+                    Icons.power_settings_new,
+                    (bool value) {
+                      _bleService.setLoadState(value);
+                    },
+                  ),
+                ],
+              );
+            } else {
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
+            }
+          },
+        ),
       ),
     );
   }
