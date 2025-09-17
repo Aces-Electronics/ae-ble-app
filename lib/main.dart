@@ -15,8 +15,17 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'AE BLE App',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: ThemeMode.system,
       home: const MyHomePage(),
     );
   }
@@ -55,33 +64,59 @@ class _MyHomePageState extends State<MyHomePage> {
         stream: FlutterBluePlus.scanResults,
         initialData: const [],
         builder: (context, snapshot) {
-          final scanResults = snapshot.data!;
-          return ListView.builder(
-            itemCount: scanResults.length,
-            itemBuilder: (context, index) {
-              final result = scanResults[index];
-              return ListTile(
-                title: Text(result.device.platformName.isNotEmpty
-                    ? result.device.platformName
-                    : 'Unknown Device'),
-                subtitle: Text(result.device.remoteId.toString()),
-                onTap: () {
-                  FlutterBluePlus.stopScan();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          DeviceScreen(device: result.device),
-                    ),
-                  );
-                },
-              );
-            },
+          final allDevices = snapshot.data!;
+          final aeDevices = allDevices
+              .where((element) =>
+                  element.device.platformName.startsWith('AE '))
+              .toList();
+          final otherDevicesCount = allDevices.length - aeDevices.length;
+
+          return Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  itemCount: aeDevices.length,
+                  itemBuilder: (context, index) {
+                    final result = aeDevices[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: ListTile(
+                        leading: const Icon(Icons.bluetooth),
+                        title: Text(result.device.platformName.isNotEmpty
+                            ? result.device.platformName
+                            : 'Unknown Device'),
+                        subtitle: Text(result.device.remoteId.toString()),
+                        onTap: () {
+                          FlutterBluePlus.stopScan();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  DeviceScreen(device: result.device),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+              if (otherDevicesCount > 0)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    '$otherDevicesCount other device(s) found.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+            ],
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => FlutterBluePlus.startScan(timeout: const Duration(seconds: 5)),
+        onPressed: () =>
+            FlutterBluePlus.startScan(timeout: const Duration(seconds: 5)),
         child: const Icon(Icons.search),
       ),
     );

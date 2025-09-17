@@ -1,6 +1,14 @@
 // lib/models/smart_shunt.dart
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
+enum ErrorState {
+  normal,
+  warning,
+  critical,
+  overflow,
+  notCalibrated,
+}
+
 class SmartShunt {
   final double batteryVoltage;
   final double batteryCurrent;
@@ -9,6 +17,10 @@ class SmartShunt {
   final double remainingCapacity;
   final double starterBatteryVoltage;
   final bool isCalibrated;
+  final ErrorState errorState;
+  final bool loadState;
+  final double cutoffVoltage;
+  final double reconnectVoltage;
 
   SmartShunt({
     this.batteryVoltage = 0.0,
@@ -18,6 +30,10 @@ class SmartShunt {
     this.remainingCapacity = 0.0,
     this.starterBatteryVoltage = 0.0,
     this.isCalibrated = false,
+    this.errorState = ErrorState.notCalibrated,
+    this.loadState = false,
+    this.cutoffVoltage = 0.0,
+    this.reconnectVoltage = 0.0,
   });
 
   // Add a copyWith method to easily update the state
@@ -29,6 +45,10 @@ class SmartShunt {
     double? remainingCapacity,
     double? starterBatteryVoltage,
     bool? isCalibrated,
+    ErrorState? errorState,
+    bool? loadState,
+    double? cutoffVoltage,
+    double? reconnectVoltage,
   }) {
     return SmartShunt(
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
@@ -36,27 +56,42 @@ class SmartShunt {
       batteryPower: batteryPower ?? this.batteryPower,
       soc: soc ?? this.soc,
       remainingCapacity: remainingCapacity ?? this.remainingCapacity,
-      starterBatteryVoltage: starterBatteryVoltage ?? this.starterBatteryVoltage,
+      starterBatteryVoltage:
+          starterBatteryVoltage ?? this.starterBatteryVoltage,
       isCalibrated: isCalibrated ?? this.isCalibrated,
+      errorState: errorState ?? this.errorState,
+      loadState: loadState ?? this.loadState,
+      cutoffVoltage: cutoffVoltage ?? this.cutoffVoltage,
+      reconnectVoltage: reconnectVoltage ?? this.reconnectVoltage,
     );
   }
 
   @override
   String toString() {
-    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated)';
+    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage)';
   }
 }
 
 const String AE_SMART_SHUNT_DEVICE_NAME = 'AE Smart Shunt';
 
 // Service UUID
-final Guid SMART_SHUNT_SERVICE_UUID = Guid("4fafc201-1fb5-459e-8fcc-c5c9c331914b");
+final Guid SMART_SHUNT_SERVICE_UUID =
+    Guid("4fafc201-1fb5-459e-8fcc-c5c9c331914b");
 
 // Characteristic UUIDs
 final Guid BATTERY_VOLTAGE_UUID = Guid("beb5483e-36e1-4688-b7f5-ea07361b26a8");
 final Guid BATTERY_CURRENT_UUID = Guid("a8b31859-676a-486c-94a2-8928b8e3a249");
 final Guid BATTERY_POWER_UUID = Guid("465048d2-871d-4234-9e48-35d033a875a8");
 final Guid SOC_UUID = Guid("7c6c3e2e-4171-4228-8e8e-8b6c3a3b341b");
-final Guid REMAINING_CAPACITY_UUID = Guid("3c3e8e1a-8b8a-4b0e-8e8e-8b6c3a3b341b");
-final Guid STARTER_BATTERY_VOLTAGE_UUID = Guid("5b2e3f40-8b8a-4b0e-8e8e-8b6c3a3b341b");
-final Guid CALIBRATION_STATUS_UUID = Guid("9b1e3f40-8b8a-4b0e-8e8e-8b6c3a3b341b");
+final Guid REMAINING_CAPACITY_UUID =
+    Guid("3c3e8e1a-8b8a-4b0e-8e8e-8b6c3a3b341b");
+final Guid STARTER_BATTERY_VOLTAGE_UUID =
+    Guid("5b2e3f40-8b8a-4b0e-8e8e-8b6c3a3b341b");
+final Guid CALIBRATION_STATUS_UUID =
+    Guid("9b1e3f40-8b8a-4b0e-8e8e-8b6c3a3b341b");
+final Guid ERROR_STATE_UUID = Guid("a3b4c5d6-e7f8-9012-3456-789012345678");
+final Guid LOAD_STATE_UUID = Guid("b4c5d6e7-f890-1234-5678-901234567890");
+final Guid LOAD_CONTROL_UUID = Guid("c5d6e7f8-9012-3456-7890-123456789012");
+final Guid SET_SOC_UUID = Guid("d6e7f890-1234-5678-9012-345678901234");
+final Guid SET_VOLTAGE_PROTECTION_UUID =
+    Guid("e7f89012-3456-7890-1234-567890123456");
