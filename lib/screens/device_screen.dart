@@ -97,6 +97,16 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       _bleService.setLoadState(value);
                     },
                   ),
+                  InkWell(
+                    onTap: () => _showSetSocDialog(context),
+                    child: _buildInfoTile(
+                        context, 'Set SOC', 'Tap to set', Icons.tune),
+                  ),
+                  InkWell(
+                    onTap: () => _showSetVoltageProtectionDialog(context),
+                    child: _buildInfoTile(context, 'Set Voltage Protection',
+                        'Tap to set', Icons.security),
+                  ),
                 ],
               );
             } else {
@@ -107,6 +117,120 @@ class _DeviceScreenState extends State<DeviceScreen> {
           },
         ),
       ),
+    );
+  }
+
+  void _showSetSocDialog(BuildContext context) {
+    final socController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Set State of Charge (SOC)'),
+          content: TextField(
+            controller: socController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'SOC (%)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final soc = double.tryParse(socController.text);
+                if (soc != null && soc >= 0 && soc <= 100) {
+                  _bleService.setSoc(soc);
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Set'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSetVoltageProtectionDialog(BuildContext context) {
+    final cutoffController = TextEditingController();
+    final reconnectController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Set Voltage Protection'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: cutoffController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Cutoff Voltage (V)',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || double.tryParse(value) == null) {
+                      return 'Please enter a valid number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: reconnectController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Reconnect Voltage (V)',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || double.tryParse(value) == null) {
+                      return 'Please enter a valid number';
+                    }
+                    final cutoff = double.tryParse(cutoffController.text);
+                    final reconnect = double.tryParse(value);
+                    if (cutoff != null &&
+                        reconnect != null &&
+                        reconnect <= cutoff) {
+                      return 'Reconnect must be greater than cutoff';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  final cutoff = double.parse(cutoffController.text);
+                  final reconnect = double.parse(reconnectController.text);
+                  _bleService.setVoltageProtection(cutoff, reconnect);
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Set'),
+            ),
+          ],
+        );
+      },
     );
   }
 

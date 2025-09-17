@@ -71,6 +71,39 @@ class BleService {
     }
   }
 
+  Future<void> setSoc(double soc) async {
+    if (_device == null) return;
+    List<BluetoothService> services = await _device!.discoverServices();
+    for (BluetoothService service in services) {
+      if (service.uuid == SMART_SHUNT_SERVICE_UUID) {
+        for (BluetoothCharacteristic characteristic in service.characteristics) {
+          if (characteristic.uuid == SET_SOC_UUID) {
+            final byteData = ByteData(4)..setFloat32(0, soc, Endian.little);
+            await characteristic.write(byteData.buffer.asUint8List());
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> setVoltageProtection(
+      double cutoff, double reconnect) async {
+    if (_device == null) return;
+    List<BluetoothService> services = await _device!.discoverServices();
+    for (BluetoothService service in services) {
+      if (service.uuid == SMART_SHUNT_SERVICE_UUID) {
+        for (BluetoothCharacteristic characteristic in service.characteristics) {
+          if (characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID) {
+            final value = '$cutoff,$reconnect';
+            await characteristic.write(value.codeUnits);
+            break;
+          }
+        }
+      }
+    }
+  }
+
   void _updateSmartShuntData(Guid characteristicUuid, List<int> value) {
     if (value.isEmpty) return;
 
