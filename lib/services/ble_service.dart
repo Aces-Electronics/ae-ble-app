@@ -33,10 +33,17 @@ class BleService {
     });
   }
 
-  Future<void> connectToDevice(BluetoothDevice device) async {
+  Future<bool> connectToDevice(BluetoothDevice device) async {
     _device = device;
-    await device.connect();
-    discoverServices(device);
+    try {
+      await device.connect(mtu: 517);
+      await discoverServices(device);
+      return true;
+    } catch (e) {
+      // Log the error and return false to indicate failure.
+      print('Failed to connect to device: $e');
+      return false;
+    }
   }
 
   Future<void> discoverServices(BluetoothDevice device) async {
@@ -60,6 +67,8 @@ class BleService {
             _setSocCharacteristic = characteristic;
           } else if (characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID) {
             _setVoltageProtectionCharacteristic = characteristic;
+            // Explicitly read the value after discovering the characteristic
+            await _setVoltageProtectionCharacteristic?.read();
           }
         }
       }
@@ -125,6 +134,7 @@ class BleService {
           _currentSmartShunt.copyWith(loadState: value[0] == 1);
     } else if (characteristicUuid == SET_VOLTAGE_PROTECTION_UUID) {
       try {
+        if (value.isEmpty) return;
         final valueString = utf8.decode(value);
         final parts = valueString.split(',');
         if (parts.length == 2) {
