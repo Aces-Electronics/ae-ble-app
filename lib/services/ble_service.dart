@@ -53,6 +53,10 @@ class BleService {
   }
 
   Future<void> setLoadState(bool enabled) async {
+    // Optimistically update the UI
+    _currentSmartShunt = _currentSmartShunt.copyWith(loadState: enabled);
+    _smartShuntController.add(_currentSmartShunt);
+
     if (_device == null) return;
     List<BluetoothService> services = await _device!.discoverServices();
     for (BluetoothService service in services) {
