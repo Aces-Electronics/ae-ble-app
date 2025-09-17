@@ -50,6 +50,9 @@ class BleService {
             characteristic.lastValueStream.listen((value) {
               _updateSmartShuntData(characteristic.uuid, value);
             });
+            if (characteristic.properties.read) {
+              await characteristic.read();
+            }
           }
           if (characteristic.uuid == LOAD_CONTROL_UUID) {
             _loadControlCharacteristic = characteristic;
