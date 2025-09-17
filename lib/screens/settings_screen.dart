@@ -164,7 +164,7 @@ class SettingsScreen extends StatelessWidget {
                 if (formKey.currentState!.validate()) {
                   final cutoff = double.parse(cutoffController.text);
                   final reconnect = double.parse(reconnectController.text);
-                  widget.bleService.setVoltageProtection(cutoff, reconnect);
+                  bleService.setVoltageProtection(cutoff, reconnect);
                   Navigator.pop(context);
                 }
               },
