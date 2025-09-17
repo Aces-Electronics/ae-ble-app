@@ -121,17 +121,21 @@ class BleService {
       _currentSmartShunt =
           _currentSmartShunt.copyWith(loadState: value[0] == 1);
     } else if (characteristicUuid == SET_VOLTAGE_PROTECTION_UUID) {
-      final valueString = utf8.decode(value);
-      final parts = valueString.split(',');
-      if (parts.length == 2) {
-        final cutoff = double.tryParse(parts[0]);
-        final reconnect = double.tryParse(parts[1]);
-        if (cutoff != null && reconnect != null) {
-          _currentSmartShunt = _currentSmartShunt.copyWith(
-            cutoffVoltage: cutoff,
-            reconnectVoltage: reconnect,
-          );
+      try {
+        final valueString = utf8.decode(value);
+        final parts = valueString.split(',');
+        if (parts.length == 2) {
+          final cutoff = double.tryParse(parts[0]);
+          final reconnect = double.tryParse(parts[1]);
+          if (cutoff != null && reconnect != null) {
+            _currentSmartShunt = _currentSmartShunt.copyWith(
+              cutoffVoltage: cutoff,
+              reconnectVoltage: reconnect,
+            );
+          }
         }
+      } catch (e) {
+        // Gracefully handle the error to prevent a crash
       }
     }
     _smartShuntController.add(_currentSmartShunt);
