@@ -36,12 +36,14 @@ class BleService {
   Future<bool> connectToDevice(BluetoothDevice device) async {
     _device = device;
     try {
-      await device.connect(mtu: 517);
+      await device.connect(autoConnect: true);
+      await device.requestMtu(517);
       await discoverServices(device);
       return true;
     } catch (e) {
       // Log the error and return false to indicate failure.
       print('Failed to connect to device: $e');
+      await device.disconnect();
       return false;
     }
   }
