@@ -115,6 +115,22 @@ class _MyHomePageState extends State<MyHomePage> {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        onPressed: () =>
+            FlutterBluePlus.startScan(timeout: const Duration(seconds: 5)),
+        child: const Icon(Icons.search),
+      ),
+    );
+  }
+}
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
         onPressed: () => FlutterBluePlus.startScan(timeout: const Duration(seconds: 5)),
         child: const Icon(Icons.search),
       ),

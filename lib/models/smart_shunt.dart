@@ -19,6 +19,8 @@ class SmartShunt {
   final bool isCalibrated;
   final ErrorState errorState;
   final bool loadState;
+  final double cutoffVoltage;
+  final double reconnectVoltage;
 
   SmartShunt({
     this.batteryVoltage = 0.0,
@@ -30,6 +32,8 @@ class SmartShunt {
     this.isCalibrated = false,
     this.errorState = ErrorState.notCalibrated,
     this.loadState = false,
+    this.cutoffVoltage = 0.0,
+    this.reconnectVoltage = 0.0,
   });
 
   // Add a copyWith method to easily update the state
@@ -43,6 +47,8 @@ class SmartShunt {
     bool? isCalibrated,
     ErrorState? errorState,
     bool? loadState,
+    double? cutoffVoltage,
+    double? reconnectVoltage,
   }) {
     return SmartShunt(
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
@@ -55,12 +61,14 @@ class SmartShunt {
       isCalibrated: isCalibrated ?? this.isCalibrated,
       errorState: errorState ?? this.errorState,
       loadState: loadState ?? this.loadState,
+      cutoffVoltage: cutoffVoltage ?? this.cutoffVoltage,
+      reconnectVoltage: reconnectVoltage ?? this.reconnectVoltage,
     );
   }
 
   @override
   String toString() {
-    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState)';
+    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage)';
   }
 }
 
