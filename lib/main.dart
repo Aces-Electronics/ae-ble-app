@@ -61,11 +61,11 @@ class _MyHomePageState extends State<MyHomePage> {
     } else if (voltage > 12.8) {
       return const Icon(Icons.battery_full);
     } else if (voltage > 12.4) {
-      return const Icon(Icons.battery_std);
+      return const Icon(Icons.battery_4_bar);
     } else if (voltage > 12.0) {
-      return const Icon(Icons.battery_half);
+      return const Icon(Icons.battery_3_bar);
     } else if (voltage > 11.5) {
-      return const Icon(Icons.battery_quarter);
+      return const Icon(Icons.battery_1_bar);
     } else if (voltage > 0) {
       return const Icon(Icons.battery_alert, color: Colors.red);
     } else {

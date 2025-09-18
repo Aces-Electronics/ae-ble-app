@@ -12,19 +12,21 @@ class BeaconInfo {
 
     final manuData = r.advertisementData.manufacturerData;
     if (manuData.containsKey(espressifCompanyId)) {
-      final Uint8List? data = manuData[espressifCompanyId];
+      final List<int>? rawData = manuData[espressifCompanyId];
+      if (rawData != null) {
+        final data = Uint8List.fromList(rawData);
+        if (data.length == 3) {
+          final byteData = ByteData.sublistView(data);
 
-      if (data != null && data.length == 3) {
-        final byteData = ByteData.sublistView(data);
+          // Bytes 0-1: Voltage in millivolts (little-endian)
+          final int voltageMv = byteData.getUint16(0, Endian.little);
+          final double voltage = voltageMv / 1000.0;
 
-        // Bytes 0-1: Voltage in millivolts (little-endian)
-        final int voltageMv = byteData.getUint16(0, Endian.little);
-        final double voltage = voltageMv / 1000.0;
+          // Byte 2: Error State
+          final int errorState = byteData.getUint8(2);
 
-        // Byte 2: Error State
-        final int errorState = byteData.getUint8(2);
-
-        return BeaconInfo(voltage: voltage, errorState: errorState);
+          return BeaconInfo(voltage: voltage, errorState: errorState);
+        }
       }
     }
     return null;
