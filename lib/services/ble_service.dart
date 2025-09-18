@@ -36,7 +36,7 @@ class BleService {
   Future<bool> connectToDevice(BluetoothDevice device) async {
     _device = device;
     try {
-      await device.connect(autoConnect: true);
+      await device.connect();
       await device.requestMtu(517);
       await discoverServices(device);
       return true;
