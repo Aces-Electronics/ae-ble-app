@@ -1,4 +1,3 @@
-import 'package:ae_ble_app/models/beacon_info.dart';
 import 'package:ae_ble_app/screens/device_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -55,24 +54,6 @@ class _MyHomePageState extends State<MyHomePage> {
     ].request();
   }
 
-  Widget _buildBatteryIcon(double voltage) {
-    if (voltage > 13.2) {
-      return const Icon(Icons.battery_charging_full, color: Colors.green);
-    } else if (voltage > 12.8) {
-      return const Icon(Icons.battery_full);
-    } else if (voltage > 12.4) {
-      return const Icon(Icons.battery_std);
-    } else if (voltage > 12.0) {
-      return const Icon(Icons.battery_half);
-    } else if (voltage > 11.5) {
-      return const Icon(Icons.battery_quarter);
-    } else if (voltage > 0) {
-      return const Icon(Icons.battery_alert, color: Colors.red);
-    } else {
-      return const Icon(Icons.battery_unknown);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -86,7 +67,7 @@ class _MyHomePageState extends State<MyHomePage> {
           final allDevices = snapshot.data!;
           final aeDevices = allDevices
               .where((element) =>
-                  element.advertisementData.advName.startsWith('AE '))
+                  element.device.platformName.startsWith('AE '))
               .toList();
           final otherDevicesCount = allDevices.length - aeDevices.length;
 
@@ -97,21 +78,15 @@ class _MyHomePageState extends State<MyHomePage> {
                   itemCount: aeDevices.length,
                   itemBuilder: (context, index) {
                     final result = aeDevices[index];
-                    final beaconInfo = BeaconInfo.parse(result);
-
                     return Card(
                       margin: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
                       child: ListTile(
-                        leading: beaconInfo != null
-                            ? _buildBatteryIcon(beaconInfo.voltage)
-                            : const Icon(Icons.bluetooth),
-                        title: Text(result.advertisementData.advName.isNotEmpty
-                            ? result.advertisementData.advName
+                        leading: const Icon(Icons.bluetooth),
+                        title: Text(result.device.platformName.isNotEmpty
+                            ? result.device.platformName
                             : 'Unknown Device'),
-                        subtitle: Text(beaconInfo != null
-                            ? '${beaconInfo.voltage.toStringAsFixed(2)} V'
-                            : result.device.remoteId.toString()),
+                        subtitle: Text(result.device.remoteId.toString()),
                         onTap: () {
                           FlutterBluePlus.stopScan();
                           Navigator.push(
