@@ -96,6 +96,21 @@ class _DeviceScreenState extends State<DeviceScreen> {
                             'Error State',
                             _getErrorStateString(smartShunt.errorState),
                             Icons.error_outline),
+                        _buildInfoTile(
+                            context,
+                            'Last Hour Usage',
+                            '${smartShunt.lastHourWh.toStringAsFixed(2)} Wh',
+                            Icons.history_toggle_off),
+                        _buildInfoTile(
+                            context,
+                            'Last Day Usage',
+                            '${smartShunt.lastDayWh.toStringAsFixed(2)} Wh',
+                            Icons.today),
+                        _buildInfoTile(
+                            context,
+                            'Last Week Usage',
+                            '${smartShunt.lastWeekWh.toStringAsFixed(2)} Wh',
+                            Icons.calendar_view_week),
                       ],
                     ),
                     Padding(

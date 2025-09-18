@@ -150,6 +150,15 @@ class BleService {
         // ignore: avoid_print
         print('Error parsing voltage protection data: $e');
       }
+    } else if (characteristicUuid == LAST_HOUR_WH_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+          lastHourWh: byteData.getFloat32(0, Endian.little));
+    } else if (characteristicUuid == LAST_DAY_WH_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+          lastDayWh: byteData.getFloat32(0, Endian.little));
+    } else if (characteristicUuid == LAST_WEEK_WH_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+          lastWeekWh: byteData.getFloat32(0, Endian.little));
     }
     _smartShuntController.add(_currentSmartShunt);
   }
