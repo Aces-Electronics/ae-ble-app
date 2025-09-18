@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:ae_ble_app/screens/device_screen.dart';
+import 'package:ae_ble_app/services/ble_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -41,10 +42,21 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  late final BleService _bleService;
+  bool _isConnecting = false;
+  BluetoothDevice? _connectingDevice;
+
   @override
   void initState() {
     super.initState();
-    _requestPermissions();
+    _bleService = BleService();
+    _requestPermissions().then((_) => _bleService.startScan());
+  }
+
+  @override
+  void dispose() {
+    _bleService.dispose();
+    super.dispose();
   }
 
   Future<void> _requestPermissions() async {
@@ -125,6 +137,9 @@ class _MyHomePageState extends State<MyHomePage> {
                       }
                     }
 
+                    final isConnectingToThisDevice =
+                        _isConnecting && _connectingDevice == result.device;
+
                     return Card(
                       margin: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
@@ -134,16 +149,48 @@ class _MyHomePageState extends State<MyHomePage> {
                             ? result.device.platformName
                             : 'Unknown Device'),
                         subtitle: Text(result.device.remoteId.toString()),
-                        onTap: () {
-                          FlutterBluePlus.stopScan();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  DeviceScreen(device: result.device),
-                            ),
-                          );
-                        },
+                        trailing: isConnectingToThisDevice
+                            ? const CircularProgressIndicator()
+                            : null,
+                        onTap: _isConnecting
+                            ? null
+                            : () async {
+                                setState(() {
+                                  _isConnecting = true;
+                                  _connectingDevice = result.device;
+                                });
+                                try {
+                                  await _bleService
+                                      .connectToDevice(result.device);
+                                  if (mounted) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => DeviceScreen(
+                                          device: result.device,
+                                          bleService: _bleService,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(SnackBar(
+                                      content: Text(
+                                          'Failed to connect: ${e.toString()}'),
+                                      backgroundColor: Colors.red,
+                                    ));
+                                  }
+                                } finally {
+                                  if (mounted) {
+                                    setState(() {
+                                      _isConnecting = false;
+                                      _connectingDevice = null;
+                                    });
+                                  }
+                                }
+                              },
                       ),
                     );
                   },
@@ -162,9 +209,13 @@ class _MyHomePageState extends State<MyHomePage> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () =>
-            FlutterBluePlus.startScan(timeout: const Duration(seconds: 5)),
-        child: const Icon(Icons.search),
+        onPressed:
+            _isConnecting ? null : () async => await _bleService.startScan(),
+        child: _isConnecting
+            ? const CircularProgressIndicator(
+                backgroundColor: Colors.white,
+              )
+            : const Icon(Icons.search),
       ),
     );
   }

@@ -24,21 +24,17 @@ class BleService {
 
   Future<void> startScan() async {
     await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
-    FlutterBluePlus.scanResults.listen((results) {
-      for (ScanResult r in results) {
-        if (r.device.platformName == AE_SMART_SHUNT_DEVICE_NAME) {
-          FlutterBluePlus.stopScan();
-          connectToDevice(r.device);
-          break;
-        }
-      }
-    });
   }
 
   Future<void> connectToDevice(BluetoothDevice device) async {
     _device = device;
-    await device.connect();
-    discoverServices(device);
+    try {
+      FlutterBluePlus.stopScan();
+      await device.connect();
+      await discoverServices(device);
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<void> discoverServices(BluetoothDevice device) async {
