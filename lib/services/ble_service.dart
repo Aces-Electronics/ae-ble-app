@@ -125,11 +125,14 @@ class BleService {
           _currentSmartShunt.copyWith(loadState: value[0] == 1);
     } else if (characteristicUuid == SET_VOLTAGE_PROTECTION_UUID) {
       try {
-        // ignore: avoid_print
-        print("Received raw data for voltage protection: $value");
-        final valueString = utf8.decode(value).trim();
-        // ignore: avoid_print
-        print("Decoded voltage protection string: '$valueString'");
+        // The device sends a C-style string (null-terminated). Find the first null byte.
+        final nullTerminatorIndex = value.indexOf(0);
+        // Take the sublist up to the null terminator, or the full list if not found.
+        final actualValue = nullTerminatorIndex != -1
+            ? value.sublist(0, nullTerminatorIndex)
+            : value;
+
+        final valueString = utf8.decode(actualValue).trim();
         final parts = valueString.split(',');
         if (parts.length == 2) {
           final cutoff = double.tryParse(parts[0]);
@@ -140,15 +143,9 @@ class BleService {
               reconnectVoltage: reconnect,
             );
           }
-        } else {
-          // ignore: avoid_print
-          print(
-              "Failed to parse voltage protection string: incorrect number of parts.");
         }
       } catch (e) {
         // Gracefully handle the error to prevent a crash
-        // ignore: avoid_print
-        print('Error parsing voltage protection data: $e');
       }
     } else if (characteristicUuid == LAST_HOUR_WH_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
