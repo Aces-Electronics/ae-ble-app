@@ -21,6 +21,11 @@ class SmartShunt {
   final bool loadState;
   final double cutoffVoltage;
   final double reconnectVoltage;
+  final double lastHourWh;
+  final double lastDayWh;
+  final double lastWeekWh;
+  final int lowVoltageDisconnectDelay;
+  final String deviceNameSuffix;
 
   SmartShunt({
     this.batteryVoltage = 0.0,
@@ -34,6 +39,11 @@ class SmartShunt {
     this.loadState = false,
     this.cutoffVoltage = 0.0,
     this.reconnectVoltage = 0.0,
+    this.lastHourWh = 0.0,
+    this.lastDayWh = 0.0,
+    this.lastWeekWh = 0.0,
+    this.lowVoltageDisconnectDelay = 0,
+    this.deviceNameSuffix = '',
   });
 
   // Add a copyWith method to easily update the state
@@ -49,6 +59,11 @@ class SmartShunt {
     bool? loadState,
     double? cutoffVoltage,
     double? reconnectVoltage,
+    double? lastHourWh,
+    double? lastDayWh,
+    double? lastWeekWh,
+    int? lowVoltageDisconnectDelay,
+    String? deviceNameSuffix,
   }) {
     return SmartShunt(
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
@@ -63,12 +78,18 @@ class SmartShunt {
       loadState: loadState ?? this.loadState,
       cutoffVoltage: cutoffVoltage ?? this.cutoffVoltage,
       reconnectVoltage: reconnectVoltage ?? this.reconnectVoltage,
+      lastHourWh: lastHourWh ?? this.lastHourWh,
+      lastDayWh: lastDayWh ?? this.lastDayWh,
+      lastWeekWh: lastWeekWh ?? this.lastWeekWh,
+      lowVoltageDisconnectDelay:
+          lowVoltageDisconnectDelay ?? this.lowVoltageDisconnectDelay,
+      deviceNameSuffix: deviceNameSuffix ?? this.deviceNameSuffix,
     );
   }
 
   @override
   String toString() {
-    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage)';
+    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage, lastHourWh: $lastHourWh, lastDayWh: $lastDayWh, lastWeekWh: $lastWeekWh, lowVoltageDisconnectDelay: $lowVoltageDisconnectDelay, deviceNameSuffix: $deviceNameSuffix)';
   }
 }
 
@@ -95,3 +116,16 @@ final Guid LOAD_CONTROL_UUID = Guid("c5d6e7f8-9012-3456-7890-123456789012");
 final Guid SET_SOC_UUID = Guid("d6e7f890-1234-5678-9012-345678901234");
 final Guid SET_VOLTAGE_PROTECTION_UUID =
     Guid("e7f89012-3456-7890-1234-567890123456");
+
+// Energy Usage Characteristic UUIDs
+final Guid LAST_HOUR_WH_UUID = Guid("0A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C5D");
+final Guid LAST_DAY_WH_UUID = Guid("1A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C5E");
+final Guid LAST_WEEK_WH_UUID = Guid("2A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C5F");
+
+// Low-Voltage Disconnect Delay Characteristic UUID
+final Guid LOW_VOLTAGE_DISCONNECT_DELAY_UUID =
+    Guid("3A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C60");
+
+// Device Name Suffix Characteristic UUID
+final Guid DEVICE_NAME_SUFFIX_UUID =
+    Guid("4A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C61");

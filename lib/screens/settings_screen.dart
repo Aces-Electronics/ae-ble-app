@@ -52,6 +52,20 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () =>
                       _showSetVoltageProtectionDialog(context, smartShunt),
                 ),
+                ListTile(
+                  title: const Text('Low-Voltage Disconnect Delay'),
+                  subtitle: Text(
+                      '${smartShunt.lowVoltageDisconnectDelay.toString()} seconds'),
+                  onTap: () => _showSetDelayDialog(context, smartShunt),
+                ),
+                ListTile(
+                  title: const Text('Set Device Name Suffix'),
+                  subtitle: Text(smartShunt.deviceNameSuffix.isNotEmpty
+                      ? smartShunt.deviceNameSuffix
+                      : 'Not Set'),
+                  onTap: () =>
+                      _showSetDeviceNameSuffixDialog(context, smartShunt),
+                ),
               ],
             ),
           );
@@ -173,6 +187,134 @@ class SettingsScreen extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  void _showSetDelayDialog(BuildContext context, SmartShunt smartShunt) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Set Low-Voltage Disconnect Delay'),
+          content: LowVoltageDelayDropdown(
+            bleService: bleService,
+            initialDelay: smartShunt.lowVoltageDisconnectDelay,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSetDeviceNameSuffixDialog(
+      BuildContext context, SmartShunt smartShunt) {
+    final suffixController =
+        TextEditingController(text: smartShunt.deviceNameSuffix);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Set Device Name Suffix'),
+          content: TextField(
+            controller: suffixController,
+            maxLength: 15,
+            decoration: const InputDecoration(
+              labelText: 'Suffix',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                bleService.setDeviceNameSuffix(suffixController.text);
+                Navigator.pop(context);
+              },
+              child: const Text('Set'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class LowVoltageDelayDropdown extends StatefulWidget {
+  final BleService bleService;
+  final int initialDelay;
+
+  const LowVoltageDelayDropdown(
+      {super.key, required this.bleService, required this.initialDelay});
+
+  @override
+  State<LowVoltageDelayDropdown> createState() =>
+      _LowVoltageDelayDropdownState();
+}
+
+class _LowVoltageDelayDropdownState extends State<LowVoltageDelayDropdown> {
+  // Map of display text to value in seconds
+  final Map<String, int> delayOptions = {
+    '1 Second': 1,
+    '10 Seconds': 10,
+    '1 Minute': 60,
+    '5 Minutes': 300,
+    '10 Minutes': 600,
+    '30 Minutes': 1800,
+  };
+
+  int? _currentDelay;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentDelay = widget.initialDelay;
+  }
+
+  Future<void> _onChanged(String? selectedOption) async {
+    if (selectedOption == null) return;
+
+    final int seconds = delayOptions[selectedOption]!;
+
+    try {
+      await widget.bleService.setLowVoltageDisconnectDelay(seconds);
+      setState(() {
+        _currentDelay = seconds;
+      });
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error writing low voltage delay: $e');
+      // Handle error (e.g., show a snackbar)
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Find the display text for the current delay value
+    final String? currentOption = delayOptions.entries
+        .firstWhere((entry) => entry.value == _currentDelay,
+            orElse: () => const MapEntry('Custom', -1))
+        .key;
+
+    return DropdownButton<String>(
+      value: currentOption != 'Custom' ? currentOption : null,
+      hint: Text(_currentDelay != null && currentOption == 'Custom'
+          ? '$_currentDelay Seconds'
+          : 'Select Delay'),
+      onChanged: _onChanged,
+      items: delayOptions.keys.map<DropdownMenuItem<String>>((String value) {
+        return DropdownMenuItem<String>(
+          value: value,
+          child: Text(value),
+        );
+      }).toList(),
     );
   }
 }

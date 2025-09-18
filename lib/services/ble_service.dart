@@ -15,6 +15,8 @@ class BleService {
   BluetoothCharacteristic? _loadControlCharacteristic;
   BluetoothCharacteristic? _setSocCharacteristic;
   BluetoothCharacteristic? _setVoltageProtectionCharacteristic;
+  BluetoothCharacteristic? _setLowVoltageDisconnectDelayCharacteristic;
+  BluetoothCharacteristic? _setDeviceNameSuffixCharacteristic;
 
   void dispose() {
     _smartShuntController.close();
@@ -22,23 +24,18 @@ class BleService {
 
   Future<void> startScan() async {
     await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
-    FlutterBluePlus.scanResults.listen((results) {
-      for (ScanResult r in results) {
-        if (r.device.platformName == AE_SMART_SHUNT_DEVICE_NAME) {
-          FlutterBluePlus.stopScan();
-          connectToDevice(r.device);
-          break;
-        }
-      }
-    });
   }
 
   Future<void> connectToDevice(BluetoothDevice device) async {
     print('Connecting to device: ${device.remoteId}');
     _device = device;
-    await device.connect();
-    print('Connected to device: ${device.remoteId}');
-    discoverServices(device);
+    try {
+      FlutterBluePlus.stopScan();
+      await device.connect();
+      await discoverServices(device);
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<void> discoverServices(BluetoothDevice device) async {
@@ -67,6 +64,11 @@ class BleService {
             _setSocCharacteristic = characteristic;
           } else if (characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID) {
             _setVoltageProtectionCharacteristic = characteristic;
+          } else if (characteristic.uuid ==
+              LOW_VOLTAGE_DISCONNECT_DELAY_UUID) {
+            _setLowVoltageDisconnectDelayCharacteristic = characteristic;
+          } else if (characteristic.uuid == DEVICE_NAME_SUFFIX_UUID) {
+            _setDeviceNameSuffixCharacteristic = characteristic;
           }
         }
       }
@@ -95,6 +97,21 @@ class BleService {
     if (_setVoltageProtectionCharacteristic != null) {
       final value = '$cutoff,$reconnect';
       await _setVoltageProtectionCharacteristic!.write(value.codeUnits);
+    }
+  }
+
+  Future<void> setLowVoltageDisconnectDelay(int seconds) async {
+    if (_setLowVoltageDisconnectDelayCharacteristic != null) {
+      final buffer = ByteData(4);
+      buffer.setUint32(0, seconds, Endian.little);
+      await _setLowVoltageDisconnectDelayCharacteristic!
+          .write(buffer.buffer.asUint8List());
+    }
+  }
+
+  Future<void> setDeviceNameSuffix(String suffix) async {
+    if (_setDeviceNameSuffixCharacteristic != null) {
+      await _setDeviceNameSuffixCharacteristic!.write(utf8.encode(suffix));
     }
   }
 
@@ -132,7 +149,14 @@ class BleService {
           _currentSmartShunt.copyWith(loadState: value[0] == 1);
     } else if (characteristicUuid == SET_VOLTAGE_PROTECTION_UUID) {
       try {
-        final valueString = utf8.decode(value);
+        // The device sends a C-style string (null-terminated). Find the first null byte.
+        final nullTerminatorIndex = value.indexOf(0);
+        // Take the sublist up to the null terminator, or the full list if not found.
+        final actualValue = nullTerminatorIndex != -1
+            ? value.sublist(0, nullTerminatorIndex)
+            : value;
+
+        final valueString = utf8.decode(actualValue).trim();
         final parts = valueString.split(',');
         if (parts.length == 2) {
           final cutoff = double.tryParse(parts[0]);
@@ -144,6 +168,29 @@ class BleService {
             );
           }
         }
+      } catch (e) {
+        // Gracefully handle the error to prevent a crash
+      }
+    } else if (characteristicUuid == LAST_HOUR_WH_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+          lastHourWh: byteData.getFloat32(0, Endian.little));
+    } else if (characteristicUuid == LAST_DAY_WH_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+          lastDayWh: byteData.getFloat32(0, Endian.little));
+    } else if (characteristicUuid == LAST_WEEK_WH_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+          lastWeekWh: byteData.getFloat32(0, Endian.little));
+    } else if (characteristicUuid == LOW_VOLTAGE_DISCONNECT_DELAY_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+          lowVoltageDisconnectDelay: byteData.getUint32(0, Endian.little));
+    } else if (characteristicUuid == DEVICE_NAME_SUFFIX_UUID) {
+      try {
+        final nullTerminatorIndex = value.indexOf(0);
+        final actualValue = nullTerminatorIndex != -1
+            ? value.sublist(0, nullTerminatorIndex)
+            : value;
+        _currentSmartShunt = _currentSmartShunt.copyWith(
+            deviceNameSuffix: utf8.decode(actualValue));
       } catch (e) {
         // Gracefully handle the error to prevent a crash
       }

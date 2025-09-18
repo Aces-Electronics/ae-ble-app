@@ -8,35 +8,36 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 class DeviceScreen extends StatefulWidget {
   final BluetoothDevice device;
+  final BleService bleService;
 
-  const DeviceScreen({super.key, required this.device});
+  const DeviceScreen(
+      {super.key, required this.device, required this.bleService});
 
   @override
   State<DeviceScreen> createState() => _DeviceScreenState();
 }
 
 class _DeviceScreenState extends State<DeviceScreen> {
-  late final BleService _bleService;
-  StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
+  late final StreamSubscription<BluetoothConnectionState>
+      _connectionStateSubscription;
 
   @override
   void initState() {
     super.initState();
-    _bleService = BleService();
-    _bleService.connectToDevice(widget.device);
     _connectionStateSubscription =
         widget.device.connectionState.listen((state) {
       if (state == BluetoothConnectionState.disconnected) {
-        Navigator.of(context).pop();
+        // Pop the screen when the device disconnects
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
       }
     });
   }
 
   @override
   void dispose() {
-    _connectionStateSubscription?.cancel();
-    _bleService.dispose();
-    widget.device.disconnect();
+    _connectionStateSubscription.cancel();
     super.dispose();
   }
 
@@ -48,7 +49,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       ),
       body: SafeArea(
         child: StreamBuilder<SmartShunt>(
-          stream: _bleService.smartShuntStream,
+          stream: widget.bleService.smartShuntStream,
           builder: (context, snapshot) {
             if (snapshot.hasData) {
               final smartShunt = snapshot.data!;
@@ -106,6 +107,21 @@ class _DeviceScreenState extends State<DeviceScreen> {
                             'Error State',
                             _getErrorStateString(smartShunt.errorState),
                             Icons.error_outline),
+                        _buildInfoTile(
+                            context,
+                            'Last Hour Usage',
+                            '${smartShunt.lastHourWh.toStringAsFixed(2)} Wh',
+                            Icons.history_toggle_off),
+                        _buildInfoTile(
+                            context,
+                            'Last Day Usage',
+                            '${smartShunt.lastDayWh.toStringAsFixed(2)} Wh',
+                            Icons.today),
+                        _buildInfoTile(
+                            context,
+                            'Last Week Usage',
+                            '${smartShunt.lastWeekWh.toStringAsFixed(2)} Wh',
+                            Icons.calendar_view_week),
                       ],
                     ),
                     Padding(
@@ -120,8 +136,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => SettingsScreen(
-                                  bleService: _bleService,
-                                  smartShuntStream: _bleService.smartShuntStream,
+                                  bleService: widget.bleService,
+                                  smartShuntStream:
+                                      widget.bleService.smartShuntStream,
                                 ),
                               ),
                             );
