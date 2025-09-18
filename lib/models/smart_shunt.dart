@@ -24,6 +24,7 @@ class SmartShunt {
   final double lastHourWh;
   final double lastDayWh;
   final double lastWeekWh;
+  final int lowVoltageDisconnectDelay;
 
   SmartShunt({
     this.batteryVoltage = 0.0,
@@ -40,6 +41,7 @@ class SmartShunt {
     this.lastHourWh = 0.0,
     this.lastDayWh = 0.0,
     this.lastWeekWh = 0.0,
+    this.lowVoltageDisconnectDelay = 0,
   });
 
   // Add a copyWith method to easily update the state
@@ -58,6 +60,7 @@ class SmartShunt {
     double? lastHourWh,
     double? lastDayWh,
     double? lastWeekWh,
+    int? lowVoltageDisconnectDelay,
   }) {
     return SmartShunt(
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
@@ -75,12 +78,14 @@ class SmartShunt {
       lastHourWh: lastHourWh ?? this.lastHourWh,
       lastDayWh: lastDayWh ?? this.lastDayWh,
       lastWeekWh: lastWeekWh ?? this.lastWeekWh,
+      lowVoltageDisconnectDelay:
+          lowVoltageDisconnectDelay ?? this.lowVoltageDisconnectDelay,
     );
   }
 
   @override
   String toString() {
-    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage, lastHourWh: $lastHourWh, lastDayWh: $lastDayWh, lastWeekWh: $lastWeekWh)';
+    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage, lastHourWh: $lastHourWh, lastDayWh: $lastDayWh, lastWeekWh: $lastWeekWh, lowVoltageDisconnectDelay: $lowVoltageDisconnectDelay)';
   }
 }
 
@@ -112,3 +117,7 @@ final Guid SET_VOLTAGE_PROTECTION_UUID =
 final Guid LAST_HOUR_WH_UUID = Guid("0A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C5D");
 final Guid LAST_DAY_WH_UUID = Guid("1A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C5E");
 final Guid LAST_WEEK_WH_UUID = Guid("2A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C5F");
+
+// Low-Voltage Disconnect Delay Characteristic UUID
+final Guid LOW_VOLTAGE_DISCONNECT_DELAY_UUID =
+    Guid("3A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C60");

@@ -15,6 +15,7 @@ class BleService {
   BluetoothCharacteristic? _loadControlCharacteristic;
   BluetoothCharacteristic? _setSocCharacteristic;
   BluetoothCharacteristic? _setVoltageProtectionCharacteristic;
+  BluetoothCharacteristic? _setLowVoltageDisconnectDelayCharacteristic;
 
   void dispose() {
     _smartShuntController.close();
@@ -60,6 +61,9 @@ class BleService {
             _setSocCharacteristic = characteristic;
           } else if (characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID) {
             _setVoltageProtectionCharacteristic = characteristic;
+          } else if (characteristic.uuid ==
+              LOW_VOLTAGE_DISCONNECT_DELAY_UUID) {
+            _setLowVoltageDisconnectDelayCharacteristic = characteristic;
           }
         }
       }
@@ -88,6 +92,15 @@ class BleService {
     if (_setVoltageProtectionCharacteristic != null) {
       final value = '$cutoff,$reconnect';
       await _setVoltageProtectionCharacteristic!.write(value.codeUnits);
+    }
+  }
+
+  Future<void> setLowVoltageDisconnectDelay(int seconds) async {
+    if (_setLowVoltageDisconnectDelayCharacteristic != null) {
+      final buffer = ByteData(4);
+      buffer.setUint32(0, seconds, Endian.little);
+      await _setLowVoltageDisconnectDelayCharacteristic!
+          .write(buffer.buffer.asUint8List());
     }
   }
 
@@ -156,6 +169,9 @@ class BleService {
     } else if (characteristicUuid == LAST_WEEK_WH_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
           lastWeekWh: byteData.getFloat32(0, Endian.little));
+    } else if (characteristicUuid == LOW_VOLTAGE_DISCONNECT_DELAY_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+          lowVoltageDisconnectDelay: byteData.getUint32(0, Endian.little));
     }
     _smartShuntController.add(_currentSmartShunt);
   }

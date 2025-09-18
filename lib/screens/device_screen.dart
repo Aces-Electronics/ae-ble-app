@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ae_ble_app/models/smart_shunt.dart';
 import 'package:ae_ble_app/screens/settings_screen.dart';
 import 'package:ae_ble_app/services/ble_service.dart';
@@ -15,16 +17,29 @@ class DeviceScreen extends StatefulWidget {
 
 class _DeviceScreenState extends State<DeviceScreen> {
   late final BleService _bleService;
+  late final StreamSubscription<BluetoothConnectionState>
+      _connectionStateSubscription;
 
   @override
   void initState() {
     super.initState();
     _bleService = BleService();
     _bleService.connectToDevice(widget.device);
+
+    _connectionStateSubscription =
+        widget.device.connectionState.listen((state) {
+      if (state == BluetoothConnectionState.disconnected) {
+        // Pop the screen when the device disconnects
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    _connectionStateSubscription.cancel();
     _bleService.dispose();
     widget.device.disconnect();
     super.dispose();
