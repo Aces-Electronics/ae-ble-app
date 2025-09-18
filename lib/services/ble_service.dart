@@ -16,6 +16,7 @@ class BleService {
   BluetoothCharacteristic? _setSocCharacteristic;
   BluetoothCharacteristic? _setVoltageProtectionCharacteristic;
   BluetoothCharacteristic? _setLowVoltageDisconnectDelayCharacteristic;
+  BluetoothCharacteristic? _setDeviceNameSuffixCharacteristic;
 
   void dispose() {
     _smartShuntController.close();
@@ -64,6 +65,8 @@ class BleService {
           } else if (characteristic.uuid ==
               LOW_VOLTAGE_DISCONNECT_DELAY_UUID) {
             _setLowVoltageDisconnectDelayCharacteristic = characteristic;
+          } else if (characteristic.uuid == DEVICE_NAME_SUFFIX_UUID) {
+            _setDeviceNameSuffixCharacteristic = characteristic;
           }
         }
       }
@@ -101,6 +104,12 @@ class BleService {
       buffer.setUint32(0, seconds, Endian.little);
       await _setLowVoltageDisconnectDelayCharacteristic!
           .write(buffer.buffer.asUint8List());
+    }
+  }
+
+  Future<void> setDeviceNameSuffix(String suffix) async {
+    if (_setDeviceNameSuffixCharacteristic != null) {
+      await _setDeviceNameSuffixCharacteristic!.write(utf8.encode(suffix));
     }
   }
 
@@ -172,6 +181,17 @@ class BleService {
     } else if (characteristicUuid == LOW_VOLTAGE_DISCONNECT_DELAY_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
           lowVoltageDisconnectDelay: byteData.getUint32(0, Endian.little));
+    } else if (characteristicUuid == DEVICE_NAME_SUFFIX_UUID) {
+      try {
+        final nullTerminatorIndex = value.indexOf(0);
+        final actualValue = nullTerminatorIndex != -1
+            ? value.sublist(0, nullTerminatorIndex)
+            : value;
+        _currentSmartShunt = _currentSmartShunt.copyWith(
+            deviceNameSuffix: utf8.decode(actualValue));
+      } catch (e) {
+        // Gracefully handle the error to prevent a crash
+      }
     }
     _smartShuntController.add(_currentSmartShunt);
   }

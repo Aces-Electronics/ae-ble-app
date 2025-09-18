@@ -56,17 +56,31 @@ class _MyHomePageState extends State<MyHomePage> {
     ].request();
   }
 
-  Widget _getBatteryIcon(double voltage) {
-    if (voltage > 13.2) {
-      return const Icon(Icons.battery_full, color: Colors.green);
-    } else if (voltage > 12.8) {
-      return const Icon(Icons.battery_5_bar, color: Colors.green);
-    } else if (voltage > 12.4) {
-      return const Icon(Icons.battery_3_bar, color: Colors.orange);
-    } else if (voltage > 12.0) {
-      return const Icon(Icons.battery_1_bar, color: Colors.red);
+  Widget _getBatteryIcon(double voltage, bool isLoadOn) {
+    if (isLoadOn) {
+      if (voltage > 13.2) {
+        return const Icon(Icons.battery_charging_full, color: Colors.green);
+      } else if (voltage > 12.8) {
+        return const Icon(Icons.battery_charging_full, color: Colors.green);
+      } else if (voltage > 12.4) {
+        return const Icon(Icons.battery_charging_full, color: Colors.orange);
+      } else if (voltage > 12.0) {
+        return const Icon(Icons.battery_charging_full, color: Colors.red);
+      } else {
+        return const Icon(Icons.battery_alert, color: Colors.red);
+      }
     } else {
-      return const Icon(Icons.battery_alert, color: Colors.red);
+      if (voltage > 13.2) {
+        return const Icon(Icons.battery_full, color: Colors.green);
+      } else if (voltage > 12.8) {
+        return const Icon(Icons.battery_5_bar, color: Colors.green);
+      } else if (voltage > 12.4) {
+        return const Icon(Icons.battery_3_bar, color: Colors.orange);
+      } else if (voltage > 12.0) {
+        return const Icon(Icons.battery_1_bar, color: Colors.red);
+      } else {
+        return const Icon(Icons.battery_alert, color: Colors.red);
+      }
     }
   }
 
@@ -100,13 +114,14 @@ class _MyHomePageState extends State<MyHomePage> {
                     Widget leadingIcon = const Icon(Icons.bluetooth);
                     if (manufacturerData.containsKey(espressifCompanyId)) {
                       final data = manufacturerData[espressifCompanyId]!;
-                      if (data.length >= 2) {
+                      if (data.length >= 4) {
                         final byteData =
                             ByteData.sublistView(Uint8List.fromList(data));
                         final voltageMv =
                             byteData.getUint16(0, Endian.little);
                         final voltage = voltageMv / 1000.0;
-                        leadingIcon = _getBatteryIcon(voltage);
+                        final isLoadOn = byteData.getUint8(3) == 1;
+                        leadingIcon = _getBatteryIcon(voltage, isLoadOn);
                       }
                     }
 

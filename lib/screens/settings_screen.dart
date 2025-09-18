@@ -58,6 +58,14 @@ class SettingsScreen extends StatelessWidget {
                       '${smartShunt.lowVoltageDisconnectDelay.toString()} seconds'),
                   onTap: () => _showSetDelayDialog(context, smartShunt),
                 ),
+                ListTile(
+                  title: const Text('Set Device Name Suffix'),
+                  subtitle: Text(smartShunt.deviceNameSuffix.isNotEmpty
+                      ? smartShunt.deviceNameSuffix
+                      : 'Not Set'),
+                  onTap: () =>
+                      _showSetDeviceNameSuffixDialog(context, smartShunt),
+                ),
               ],
             ),
           );
@@ -196,6 +204,41 @@ class SettingsScreen extends StatelessWidget {
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSetDeviceNameSuffixDialog(
+      BuildContext context, SmartShunt smartShunt) {
+    final suffixController =
+        TextEditingController(text: smartShunt.deviceNameSuffix);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Set Device Name Suffix'),
+          content: TextField(
+            controller: suffixController,
+            maxLength: 15,
+            decoration: const InputDecoration(
+              labelText: 'Suffix',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                bleService.setDeviceNameSuffix(suffixController.text);
+                Navigator.pop(context);
+              },
+              child: const Text('Set'),
             ),
           ],
         );
