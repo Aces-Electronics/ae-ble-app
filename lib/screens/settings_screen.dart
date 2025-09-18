@@ -42,7 +42,7 @@ class SettingsScreen extends StatelessWidget {
                 ListTile(
                   title: const Text('Set State of Charge (SOC)'),
                   subtitle:
-                      Text('${(smartShunt.soc * 100).toStringAsFixed(1)} %'),
+                      Text('${(smartShunt.soc).toStringAsFixed(1)} %'),
                   onTap: () => _showSetSocDialog(context, smartShunt),
                 ),
                 ListTile(
@@ -74,7 +74,7 @@ class SettingsScreen extends StatelessWidget {
 
   void _showSetSocDialog(BuildContext context, SmartShunt smartShunt) {
     final socController =
-        TextEditingController(text: (smartShunt.soc * 100).toStringAsFixed(1));
+        TextEditingController(text: smartShunt.soc.toStringAsFixed(1));
     showDialog(
       context: context,
       builder: (context) {

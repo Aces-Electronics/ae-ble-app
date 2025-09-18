@@ -24,7 +24,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
   @override
   void initState() {
     super.initState();
-
     _connectionStateSubscription =
         widget.device.connectionState.listen((state) {
       if (state == BluetoothConnectionState.disconnected) {
@@ -84,7 +83,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                         _buildInfoTile(
                             context,
                             'State of Charge (SOC)',
-                            '${(smartShunt.soc * 100).toStringAsFixed(1)} %',
+                            '${(smartShunt.soc).toStringAsFixed(1)} %',
                             Icons.battery_std),
                         _buildInfoTile(
                             context,

@@ -27,6 +27,7 @@ class BleService {
   }
 
   Future<void> connectToDevice(BluetoothDevice device) async {
+    print('Connecting to device: ${device.remoteId}');
     _device = device;
     try {
       FlutterBluePlus.stopScan();
@@ -38,10 +39,15 @@ class BleService {
   }
 
   Future<void> discoverServices(BluetoothDevice device) async {
+    print('Discovering services for device: ${device.remoteId}');
     List<BluetoothService> services = await device.discoverServices();
+    print('Found ${services.length} services');
     for (BluetoothService service in services) {
+      print('Service: ${service.uuid}');
       if (service.uuid == SMART_SHUNT_SERVICE_UUID) {
+        print('Found Smart Shunt service');
         for (BluetoothCharacteristic characteristic in service.characteristics) {
+          print('Characteristic: ${characteristic.uuid}');
           if (characteristic.properties.read ||
               characteristic.properties.notify) {
             await characteristic.setNotifyValue(true);
