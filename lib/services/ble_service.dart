@@ -125,7 +125,7 @@ class BleService {
           _currentSmartShunt.copyWith(loadState: value[0] == 1);
     } else if (characteristicUuid == SET_VOLTAGE_PROTECTION_UUID) {
       try {
-        final valueString = utf8.decode(value);
+        final valueString = utf8.decode(value).trim();
         final parts = valueString.split(',');
         if (parts.length == 2) {
           final cutoff = double.tryParse(parts[0]);

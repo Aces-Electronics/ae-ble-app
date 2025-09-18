@@ -83,7 +83,7 @@ class SettingsScreen extends StatelessWidget {
               onPressed: () {
                 final soc = double.tryParse(socController.text);
                 if (soc != null && soc >= 0 && soc <= 100) {
-                  bleService.setSoc(soc / 100.0); // Convert to 0.0-1.0 range
+                  bleService.setSoc(soc);
                   Navigator.pop(context);
                 }
               },
