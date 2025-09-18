@@ -125,7 +125,11 @@ class BleService {
           _currentSmartShunt.copyWith(loadState: value[0] == 1);
     } else if (characteristicUuid == SET_VOLTAGE_PROTECTION_UUID) {
       try {
+        // ignore: avoid_print
+        print("Received raw data for voltage protection: $value");
         final valueString = utf8.decode(value).trim();
+        // ignore: avoid_print
+        print("Decoded voltage protection string: '$valueString'");
         final parts = valueString.split(',');
         if (parts.length == 2) {
           final cutoff = double.tryParse(parts[0]);
@@ -136,9 +140,15 @@ class BleService {
               reconnectVoltage: reconnect,
             );
           }
+        } else {
+          // ignore: avoid_print
+          print(
+              "Failed to parse voltage protection string: incorrect number of parts.");
         }
       } catch (e) {
         // Gracefully handle the error to prevent a crash
+        // ignore: avoid_print
+        print('Error parsing voltage protection data: $e');
       }
     }
     _smartShuntController.add(_currentSmartShunt);

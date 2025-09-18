@@ -54,6 +54,20 @@ class _MyHomePageState extends State<MyHomePage> {
     ].request();
   }
 
+  Widget _getBatteryIcon(double voltage) {
+    if (voltage > 13.2) {
+      return const Icon(Icons.battery_full, color: Colors.green);
+    } else if (voltage > 12.8) {
+      return const Icon(Icons.battery_5_bar, color: Colors.green);
+    } else if (voltage > 12.4) {
+      return const Icon(Icons.battery_3_bar, color: Colors.orange);
+    } else if (voltage > 12.0) {
+      return const Icon(Icons.battery_1_bar, color: Colors.red);
+    } else {
+      return const Icon(Icons.battery_alert, color: Colors.red);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,11 +92,27 @@ class _MyHomePageState extends State<MyHomePage> {
                   itemCount: aeDevices.length,
                   itemBuilder: (context, index) {
                     final result = aeDevices[index];
+                    final manufacturerData =
+                        result.advertisementData.manufacturerData;
+                    const int espressifCompanyId = 0x02E5; // 741
+                    Widget leadingIcon = const Icon(Icons.bluetooth);
+                    if (manufacturerData.containsKey(espressifCompanyId)) {
+                      final data = manufacturerData[espressifCompanyId]!;
+                      if (data.length >= 2) {
+                        final byteData =
+                            ByteData.sublistView(Uint8List.fromList(data));
+                        final voltageMv =
+                            byteData.getUint16(0, Endian.little);
+                        final voltage = voltageMv / 1000.0;
+                        leadingIcon = _getBatteryIcon(voltage);
+                      }
+                    }
+
                     return Card(
                       margin: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
                       child: ListTile(
-                        leading: const Icon(Icons.bluetooth),
+                        leading: leadingIcon,
                         title: Text(result.device.platformName.isNotEmpty
                             ? result.device.platformName
                             : 'Unknown Device'),
