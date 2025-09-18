@@ -8,23 +8,22 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 class DeviceScreen extends StatefulWidget {
   final BluetoothDevice device;
+  final BleService bleService;
 
-  const DeviceScreen({super.key, required this.device});
+  const DeviceScreen(
+      {super.key, required this.device, required this.bleService});
 
   @override
   State<DeviceScreen> createState() => _DeviceScreenState();
 }
 
 class _DeviceScreenState extends State<DeviceScreen> {
-  late final BleService _bleService;
   late final StreamSubscription<BluetoothConnectionState>
       _connectionStateSubscription;
 
   @override
   void initState() {
     super.initState();
-    _bleService = BleService();
-    _bleService.connectToDevice(widget.device);
 
     _connectionStateSubscription =
         widget.device.connectionState.listen((state) {
@@ -40,8 +39,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
   @override
   void dispose() {
     _connectionStateSubscription.cancel();
-    _bleService.dispose();
-    widget.device.disconnect();
     super.dispose();
   }
 
@@ -53,7 +50,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       ),
       body: SafeArea(
         child: StreamBuilder<SmartShunt>(
-          stream: _bleService.smartShuntStream,
+          stream: widget.bleService.smartShuntStream,
           builder: (context, snapshot) {
             if (snapshot.hasData) {
               final smartShunt = snapshot.data!;
@@ -140,8 +137,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => SettingsScreen(
-                                  bleService: _bleService,
-                                  smartShuntStream: _bleService.smartShuntStream,
+                                  bleService: widget.bleService,
+                                  smartShuntStream:
+                                      widget.bleService.smartShuntStream,
                                 ),
                               ),
                             );
