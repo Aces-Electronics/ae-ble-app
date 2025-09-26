@@ -3,9 +3,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:ae_ble_app/models/smart_shunt.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
-class BleService {
+class BleService extends ChangeNotifier {
   final StreamController<SmartShunt> _smartShuntController =
       StreamController<SmartShunt>.broadcast();
   Stream<SmartShunt> get smartShuntStream => _smartShuntController.stream;
@@ -217,5 +218,6 @@ class BleService {
       }
     }
     _smartShuntController.add(_currentSmartShunt);
+    notifyListeners();
   }
 }

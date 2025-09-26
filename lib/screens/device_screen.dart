@@ -5,13 +5,12 @@ import 'package:ae_ble_app/screens/settings_screen.dart';
 import 'package:ae_ble_app/services/ble_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:provider/provider.dart';
 
 class DeviceScreen extends StatefulWidget {
   final BluetoothDevice device;
-  final BleService bleService;
 
-  const DeviceScreen(
-      {super.key, required this.device, required this.bleService});
+  const DeviceScreen({super.key, required this.device});
 
   @override
   State<DeviceScreen> createState() => _DeviceScreenState();
@@ -20,10 +19,12 @@ class DeviceScreen extends StatefulWidget {
 class _DeviceScreenState extends State<DeviceScreen> {
   late final StreamSubscription<BluetoothConnectionState>
       _connectionStateSubscription;
+  late final BleService _bleService;
 
   @override
   void initState() {
     super.initState();
+    _bleService = Provider.of<BleService>(context, listen: false);
     _connectionStateSubscription =
         widget.device.connectionState.listen((state) {
       if (state == BluetoothConnectionState.disconnected) {
@@ -49,7 +50,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       ),
       body: SafeArea(
         child: StreamBuilder<SmartShunt>(
-          stream: widget.bleService.smartShuntStream,
+          stream: _bleService.smartShuntStream,
           builder: (context, snapshot) {
             if (snapshot.hasData) {
               final smartShunt = snapshot.data!;
@@ -135,11 +136,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => SettingsScreen(
-                                  bleService: widget.bleService,
-                                  smartShuntStream:
-                                      widget.bleService.smartShuntStream,
-                                ),
+                                builder: (context) => const SettingsScreen(),
                               ),
                             );
                           },

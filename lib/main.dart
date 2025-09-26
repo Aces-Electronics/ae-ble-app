@@ -5,9 +5,15 @@ import 'package:ae_ble_app/services/ble_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => BleService(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -49,14 +55,8 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _bleService = BleService();
+    _bleService = Provider.of<BleService>(context, listen: false);
     _requestPermissions().then((_) => _bleService.startScan());
-  }
-
-  @override
-  void dispose() {
-    _bleService.dispose();
-    super.dispose();
   }
 
   Future<void> _requestPermissions() async {
@@ -166,10 +166,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => DeviceScreen(
-                                          device: result.device,
-                                          bleService: _bleService,
-                                        ),
+                                        builder: (context) =>
+                                            DeviceScreen(device: result.device),
                                       ),
                                     );
                                   }
