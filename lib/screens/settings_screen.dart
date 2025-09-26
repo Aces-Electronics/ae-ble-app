@@ -1,4 +1,5 @@
 import 'package:ae_ble_app/models/smart_shunt.dart';
+import 'package:ae_ble_app/screens/ota_update_screen.dart';
 import 'package:ae_ble_app/services/ble_service.dart';
 import 'package:flutter/material.dart';
 
@@ -65,6 +66,18 @@ class SettingsScreen extends StatelessWidget {
                       : 'Not Set'),
                   onTap: () =>
                       _showSetDeviceNameSuffixDialog(context, smartShunt),
+                ),
+                const Divider(),
+                ListTile(
+                  title: const Text('Firmware Update'),
+                  leading: const Icon(Icons.system_update),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const OtaUpdateScreen(),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

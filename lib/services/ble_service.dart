@@ -17,6 +17,9 @@ class BleService {
   BluetoothCharacteristic? _setVoltageProtectionCharacteristic;
   BluetoothCharacteristic? _setLowVoltageDisconnectDelayCharacteristic;
   BluetoothCharacteristic? _setDeviceNameSuffixCharacteristic;
+  BluetoothCharacteristic? _wifiSsidCharacteristic;
+  BluetoothCharacteristic? _wifiPassCharacteristic;
+  BluetoothCharacteristic? _otaTriggerCharacteristic;
 
   void dispose() {
     _smartShuntController.close();
@@ -69,6 +72,12 @@ class BleService {
             _setLowVoltageDisconnectDelayCharacteristic = characteristic;
           } else if (characteristic.uuid == DEVICE_NAME_SUFFIX_UUID) {
             _setDeviceNameSuffixCharacteristic = characteristic;
+          } else if (characteristic.uuid == WIFI_SSID_CHAR_UUID) {
+            _wifiSsidCharacteristic = characteristic;
+          } else if (characteristic.uuid == WIFI_PASS_CHAR_UUID) {
+            _wifiPassCharacteristic = characteristic;
+          } else if (characteristic.uuid == OTA_TRIGGER_CHAR_UUID) {
+            _otaTriggerCharacteristic = characteristic;
           }
         }
       }
@@ -112,6 +121,18 @@ class BleService {
   Future<void> setDeviceNameSuffix(String suffix) async {
     if (_setDeviceNameSuffixCharacteristic != null) {
       await _setDeviceNameSuffixCharacteristic!.write(utf8.encode(suffix));
+    }
+  }
+
+  Future<void> startOtaUpdate(String ssid, String password) async {
+    if (_wifiSsidCharacteristic != null) {
+      await _wifiSsidCharacteristic!.write(utf8.encode(ssid));
+    }
+    if (_wifiPassCharacteristic != null) {
+      await _wifiPassCharacteristic!.write(utf8.encode(password));
+    }
+    if (_otaTriggerCharacteristic != null) {
+      await _otaTriggerCharacteristic!.write([0x01]);
     }
   }
 
