@@ -8,7 +8,6 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 enum OtaUpdateState {
   idle,
-  fetchingInitialVersion,
   updating,
   reconnecting,
   verifying,
@@ -27,7 +26,7 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
   final _ssidController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  OtaUpdateState _updateState = OtaUpdateState.fetchingInitialVersion;
+  OtaUpdateState _updateState = OtaUpdateState.idle;
   String? _initialFirmwareVersion;
   String? _newFirmwareVersion;
   String? _errorMessage;
@@ -40,7 +39,7 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
   void initState() {
     super.initState();
     _bleService = Provider.of<BleService>(context, listen: false);
-    _fetchInitialFirmwareVersion();
+    _initialFirmwareVersion = _bleService.currentSmartShunt.firmwareVersion;
   }
 
   @override
@@ -48,25 +47,6 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
     _connectionStateSubscription?.cancel();
     _smartShuntSubscription?.cancel();
     super.dispose();
-  }
-
-  Future<void> _fetchInitialFirmwareVersion() async {
-    try {
-      final smartShunt = await _bleService.smartShuntStream.first;
-      if (mounted) {
-        setState(() {
-          _initialFirmwareVersion = smartShunt.firmwareVersion;
-          _updateState = OtaUpdateState.idle;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _updateState = OtaUpdateState.failure;
-          _errorMessage = "Failed to get initial firmware version: $e";
-        });
-      }
-    }
   }
 
   void _startUpdate() async {
@@ -172,17 +152,6 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
 
   Widget _buildBody() {
     switch (_updateState) {
-      case OtaUpdateState.fetchingInitialVersion:
-        return const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Fetching current firmware version...'),
-            ],
-          ),
-        );
       case OtaUpdateState.idle:
         return _buildIdleUI();
       case OtaUpdateState.updating:

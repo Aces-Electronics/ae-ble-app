@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:ae_ble_app/models/smart_shunt.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:http/http.dart' as http;
 
 class BleService extends ChangeNotifier {
   final StreamController<SmartShunt> _smartShuntController =
@@ -12,6 +13,7 @@ class BleService extends ChangeNotifier {
   Stream<SmartShunt> get smartShuntStream => _smartShuntController.stream;
 
   SmartShunt _currentSmartShunt = SmartShunt();
+  SmartShunt get currentSmartShunt => _currentSmartShunt;
   BluetoothDevice? _device;
   BluetoothCharacteristic? _loadControlCharacteristic;
   BluetoothCharacteristic? _setSocCharacteristic;
@@ -22,6 +24,7 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _wifiPassCharacteristic;
   BluetoothCharacteristic? _otaTriggerCharacteristic;
   BluetoothCharacteristic? _firmwareVersionCharacteristic;
+  BluetoothCharacteristic? _updateUrlCharacteristic;
 
   BluetoothDevice? getDevice() => _device;
 
@@ -84,10 +87,38 @@ class BleService extends ChangeNotifier {
             _otaTriggerCharacteristic = characteristic;
           } else if (characteristic.uuid == FIRMWARE_VERSION_UUID) {
             _firmwareVersionCharacteristic = characteristic;
+          } else if (characteristic.uuid == UPDATE_URL_CHAR_UUID) {
+            _updateUrlCharacteristic = characteristic;
           }
         }
       }
     }
+  }
+
+  Future<String?> checkForUpdate() async {
+    if (_currentSmartShunt.firmwareVersion.isEmpty ||
+        _currentSmartShunt.updateUrl.isEmpty) {
+      return null;
+    }
+
+    try {
+      final url = Uri.parse(
+          'https://api.github.com/repos/${_currentSmartShunt.updateUrl}/releases/latest');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final latestVersion = jsonResponse['tag_name'];
+        if (latestVersion != null &&
+            latestVersion != _currentSmartShunt.firmwareVersion) {
+          return latestVersion;
+        }
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('Failed to check for updates: $e');
+    }
+    return null;
   }
 
   Future<void> setLoadState(bool enabled) async {
@@ -229,6 +260,17 @@ class BleService extends ChangeNotifier {
             : value;
         _currentSmartShunt = _currentSmartShunt.copyWith(
             firmwareVersion: utf8.decode(actualValue));
+      } catch (e) {
+        // Gracefully handle the error to prevent a crash
+      }
+    } else if (characteristicUuid == UPDATE_URL_CHAR_UUID) {
+      try {
+        final nullTerminatorIndex = value.indexOf(0);
+        final actualValue = nullTerminatorIndex != -1
+            ? value.sublist(0, nullTerminatorIndex)
+            : value;
+        _currentSmartShunt =
+            _currentSmartShunt.copyWith(updateUrl: utf8.decode(actualValue));
       } catch (e) {
         // Gracefully handle the error to prevent a crash
       }
