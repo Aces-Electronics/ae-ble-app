@@ -26,6 +26,7 @@ class SmartShunt {
   final double lastWeekWh;
   final int lowVoltageDisconnectDelay;
   final String deviceNameSuffix;
+  final String firmwareVersion;
 
   SmartShunt({
     this.batteryVoltage = 0.0,
@@ -44,6 +45,7 @@ class SmartShunt {
     this.lastWeekWh = 0.0,
     this.lowVoltageDisconnectDelay = 0,
     this.deviceNameSuffix = '',
+    this.firmwareVersion = '',
   });
 
   // Add a copyWith method to easily update the state
@@ -64,6 +66,7 @@ class SmartShunt {
     double? lastWeekWh,
     int? lowVoltageDisconnectDelay,
     String? deviceNameSuffix,
+    String? firmwareVersion,
   }) {
     return SmartShunt(
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
@@ -84,12 +87,13 @@ class SmartShunt {
       lowVoltageDisconnectDelay:
           lowVoltageDisconnectDelay ?? this.lowVoltageDisconnectDelay,
       deviceNameSuffix: deviceNameSuffix ?? this.deviceNameSuffix,
+      firmwareVersion: firmwareVersion ?? this.firmwareVersion,
     );
   }
 
   @override
   String toString() {
-    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage, lastHourWh: $lastHourWh, lastDayWh: $lastDayWh, lastWeekWh: $lastWeekWh, lowVoltageDisconnectDelay: $lowVoltageDisconnectDelay, deviceNameSuffix: $deviceNameSuffix)';
+    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage, lastHourWh: $lastHourWh, lastDayWh: $lastDayWh, lastWeekWh: $lastWeekWh, lowVoltageDisconnectDelay: $lowVoltageDisconnectDelay, deviceNameSuffix: $deviceNameSuffix, firmwareVersion: $firmwareVersion)';
   }
 }
 
@@ -137,3 +141,5 @@ final Guid WIFI_PASS_CHAR_UUID =
     Guid("6A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C63");
 final Guid OTA_TRIGGER_CHAR_UUID =
     Guid("7A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C64");
+final Guid FIRMWARE_VERSION_UUID =
+    Guid('8A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C65');

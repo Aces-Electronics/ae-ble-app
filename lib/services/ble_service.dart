@@ -21,6 +21,9 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _wifiSsidCharacteristic;
   BluetoothCharacteristic? _wifiPassCharacteristic;
   BluetoothCharacteristic? _otaTriggerCharacteristic;
+  BluetoothCharacteristic? _firmwareVersionCharacteristic;
+
+  BluetoothDevice? getDevice() => _device;
 
   void dispose() {
     _smartShuntController.close();
@@ -79,6 +82,8 @@ class BleService extends ChangeNotifier {
             _wifiPassCharacteristic = characteristic;
           } else if (characteristic.uuid == OTA_TRIGGER_CHAR_UUID) {
             _otaTriggerCharacteristic = characteristic;
+          } else if (characteristic.uuid == FIRMWARE_VERSION_UUID) {
+            _firmwareVersionCharacteristic = characteristic;
           }
         }
       }
@@ -213,6 +218,17 @@ class BleService extends ChangeNotifier {
             : value;
         _currentSmartShunt = _currentSmartShunt.copyWith(
             deviceNameSuffix: utf8.decode(actualValue));
+      } catch (e) {
+        // Gracefully handle the error to prevent a crash
+      }
+    } else if (characteristicUuid == FIRMWARE_VERSION_UUID) {
+      try {
+        final nullTerminatorIndex = value.indexOf(0);
+        final actualValue = nullTerminatorIndex != -1
+            ? value.sublist(0, nullTerminatorIndex)
+            : value;
+        _currentSmartShunt = _currentSmartShunt.copyWith(
+            firmwareVersion: utf8.decode(actualValue));
       } catch (e) {
         // Gracefully handle the error to prevent a crash
       }
