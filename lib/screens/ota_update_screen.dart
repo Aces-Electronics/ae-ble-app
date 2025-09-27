@@ -33,7 +33,7 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
     final currentStatus = _bleService.currentSmartShunt.otaStatus;
     if (currentStatus != OtaStatus.idle &&
         currentStatus != OtaStatus.success) {
-      _bleService.resetOtaStatus();
+      Future(_bleService.resetOtaStatus);
     }
     super.dispose();
   }
