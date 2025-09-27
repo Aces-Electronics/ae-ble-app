@@ -9,6 +9,15 @@ enum ErrorState {
   notCalibrated,
 }
 
+enum OtaStatus {
+  idle,
+  checking,
+  noUpdate,
+  downloading,
+  success,
+  failure,
+}
+
 class SmartShunt {
   final double batteryVoltage;
   final double batteryCurrent;
@@ -28,6 +37,7 @@ class SmartShunt {
   final String deviceNameSuffix;
   final String firmwareVersion;
   final String updateUrl;
+  final OtaStatus otaStatus;
 
   SmartShunt({
     this.batteryVoltage = 0.0,
@@ -48,6 +58,7 @@ class SmartShunt {
     this.deviceNameSuffix = '',
     this.firmwareVersion = '',
     this.updateUrl = '',
+    this.otaStatus = OtaStatus.idle,
   });
 
   // Add a copyWith method to easily update the state
@@ -70,6 +81,7 @@ class SmartShunt {
     String? deviceNameSuffix,
     String? firmwareVersion,
     String? updateUrl,
+    OtaStatus? otaStatus,
   }) {
     return SmartShunt(
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
@@ -92,12 +104,13 @@ class SmartShunt {
       deviceNameSuffix: deviceNameSuffix ?? this.deviceNameSuffix,
       firmwareVersion: firmwareVersion ?? this.firmwareVersion,
       updateUrl: updateUrl ?? this.updateUrl,
+      otaStatus: otaStatus ?? this.otaStatus,
     );
   }
 
   @override
   String toString() {
-    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage, lastHourWh: $lastHourWh, lastDayWh: $lastDayWh, lastWeekWh: $lastWeekWh, lowVoltageDisconnectDelay: $lowVoltageDisconnectDelay, deviceNameSuffix: $deviceNameSuffix, firmwareVersion: $firmwareVersion, updateUrl: $updateUrl)';
+    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage, lastHourWh: $lastHourWh, lastDayWh: $lastDayWh, lastWeekWh: $lastWeekWh, lowVoltageDisconnectDelay: $lowVoltageDisconnectDelay, deviceNameSuffix: $deviceNameSuffix, firmwareVersion: $firmwareVersion, updateUrl: $updateUrl, otaStatus: $otaStatus)';
   }
 }
 
@@ -149,3 +162,5 @@ final Guid FIRMWARE_VERSION_UUID =
     Guid('8A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C65');
 final Guid UPDATE_URL_CHAR_UUID =
     Guid('9A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C66');
+final Guid OTA_STATUS_CHAR_UUID =
+    Guid('AA1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C67');

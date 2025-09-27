@@ -25,6 +25,7 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _otaTriggerCharacteristic;
   BluetoothCharacteristic? _firmwareVersionCharacteristic;
   BluetoothCharacteristic? _updateUrlCharacteristic;
+  BluetoothCharacteristic? _otaStatusCharacteristic;
 
   BluetoothDevice? getDevice() => _device;
 
@@ -89,6 +90,8 @@ class BleService extends ChangeNotifier {
             _firmwareVersionCharacteristic = characteristic;
           } else if (characteristic.uuid == UPDATE_URL_CHAR_UUID) {
             _updateUrlCharacteristic = characteristic;
+          } else if (characteristic.uuid == OTA_STATUS_CHAR_UUID) {
+            _otaStatusCharacteristic = characteristic;
           }
         }
       }
@@ -274,7 +277,40 @@ class BleService extends ChangeNotifier {
       } catch (e) {
         // Gracefully handle the error to prevent a crash
       }
+    } else if (characteristicUuid == OTA_STATUS_CHAR_UUID) {
+      try {
+        final statusString = utf8.decode(value);
+        OtaStatus status;
+        switch (statusString) {
+          case "CHECKING":
+            status = OtaStatus.checking;
+            break;
+          case "NO_UPDATE":
+            status = OtaStatus.noUpdate;
+            break;
+          case "DOWNLOADING":
+            status = OtaStatus.downloading;
+            break;
+          case "SUCCESS":
+            status = OtaStatus.success;
+            break;
+          case "FAILURE":
+            status = OtaStatus.failure;
+            break;
+          default:
+            status = OtaStatus.idle;
+        }
+        _currentSmartShunt = _currentSmartShunt.copyWith(otaStatus: status);
+      } catch (e) {
+        // Gracefully handle the error
+      }
     }
+    _smartShuntController.add(_currentSmartShunt);
+    notifyListeners();
+  }
+
+  void resetOtaStatus() {
+    _currentSmartShunt = _currentSmartShunt.copyWith(otaStatus: OtaStatus.idle);
     _smartShuntController.add(_currentSmartShunt);
     notifyListeners();
   }

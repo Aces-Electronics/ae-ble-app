@@ -6,15 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:ae_ble_app/services/ble_service.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
-enum OtaUpdateState {
-  idle,
-  updating,
-  reconnecting,
-  verifying,
-  success,
-  failure,
-}
-
 class OtaUpdateScreen extends StatefulWidget {
   const OtaUpdateScreen({super.key});
 
@@ -26,211 +17,136 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
   final _ssidController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  OtaUpdateState _updateState = OtaUpdateState.idle;
-  String? _initialFirmwareVersion;
-  String? _newFirmwareVersion;
-  String? _errorMessage;
-
   late final BleService _bleService;
   StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
-  StreamSubscription<SmartShunt>? _smartShuntSubscription;
 
   @override
   void initState() {
     super.initState();
     _bleService = Provider.of<BleService>(context, listen: false);
-    _initialFirmwareVersion = _bleService.currentSmartShunt.firmwareVersion;
   }
 
   @override
   void dispose() {
     _connectionStateSubscription?.cancel();
-    _smartShuntSubscription?.cancel();
+    // Reset status on screen exit if update was not successful
+    final currentStatus = _bleService.currentSmartShunt.otaStatus;
+    if (currentStatus != OtaStatus.idle &&
+        currentStatus != OtaStatus.success) {
+      _bleService.resetOtaStatus();
+    }
     super.dispose();
   }
 
   void _startUpdate() async {
-    setState(() {
-      _updateState = OtaUpdateState.updating;
-    });
-
     try {
-      // Listen for disconnection
-      final device = _bleService.getDevice();
-      if (device == null) {
-        throw Exception("Device not connected");
-      }
-      _connectionStateSubscription = device.connectionState.listen((state) {
-        if (state == BluetoothConnectionState.disconnected) {
-          if (_updateState == OtaUpdateState.updating) {
-            // This is the expected disconnect after triggering OTA
-            _attemptReconnect(device);
-          }
-        }
-      });
-
       await _bleService.startOtaUpdate(
         _ssidController.text,
         _passwordController.text,
       );
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _updateState = OtaUpdateState.failure;
-          _errorMessage = 'Failed to start OTA update: $e';
-        });
-      }
-    }
-  }
 
-  void _attemptReconnect(BluetoothDevice device) async {
-    if (!mounted) return;
-    setState(() {
-      _updateState = OtaUpdateState.reconnecting;
-    });
-
-    // Wait a bit for the device to reboot
-    await Future.delayed(const Duration(seconds: 15));
-
-    try {
-      // Attempt to reconnect several times
-      for (int i = 0; i < 5; i++) {
-        if (!mounted) return;
-        try {
-          await _bleService.connectToDevice(device);
-          // If connection is successful, verify the version
-          _verifyFirmwareVersion();
-          return; // Exit the loop on success
-        } catch (e) {
-          if (i < 4) {
+      // Listen for disconnection, which indicates the device is rebooting
+      final device = _bleService.getDevice();
+      if (device != null) {
+        _connectionStateSubscription =
+            device.connectionState.listen((state) async {
+          if (state == BluetoothConnectionState.disconnected) {
+            // Wait for a bit and then pop the screen
             await Future.delayed(const Duration(seconds: 5));
-          } else {
-            rethrow; // Throw the last error if all retries fail
+            if (mounted) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
           }
-        }
+        });
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _updateState = OtaUpdateState.failure;
-          _errorMessage = 'Failed to reconnect to device after update: $e';
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start OTA update: $e')),
+        );
       }
     }
   }
 
-  void _verifyFirmwareVersion() {
-    if (!mounted) return;
-    setState(() {
-      _updateState = OtaUpdateState.verifying;
-    });
+  Widget _buildBody(SmartShunt smartShunt) {
+    final otaStatus = smartShunt.otaStatus;
 
-    // Listen to the stream for the updated value
-    _smartShuntSubscription = _bleService.smartShuntStream.listen((smartShunt) {
-      if (smartShunt.firmwareVersion.isNotEmpty &&
-          smartShunt.firmwareVersion != _initialFirmwareVersion) {
-        setState(() {
-          _newFirmwareVersion = smartShunt.firmwareVersion;
-          _updateState = OtaUpdateState.success;
-        });
-        _smartShuntSubscription?.cancel();
-      }
-    });
-
-    // Timeout for verification
-    Future.delayed(const Duration(seconds: 20), () {
-      if (mounted && _updateState == OtaUpdateState.verifying) {
-        setState(() {
-          _updateState = OtaUpdateState.failure;
-          _errorMessage =
-              'Verification timed out. Firmware version did not change.';
-        });
-        _smartShuntSubscription?.cancel();
-      }
-    });
-  }
-
-  Widget _buildBody() {
-    switch (_updateState) {
-      case OtaUpdateState.idle:
-        return _buildIdleUI();
-      case OtaUpdateState.updating:
-        return const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Update in progress... The device will disconnect.'),
-            ],
-          ),
-        );
-      case OtaUpdateState.reconnecting:
-        return const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Device is rebooting. Attempting to reconnect...'),
-            ],
-          ),
-        );
-      case OtaUpdateState.verifying:
-        return const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Reconnected. Verifying new firmware version...'),
-            ],
-          ),
-        );
-      case OtaUpdateState.success:
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 50),
-              const SizedBox(height: 16),
-              const Text('Update Successful!', style: TextStyle(fontSize: 20)),
-              const SizedBox(height: 8),
-              Text('Old Version: $_initialFirmwareVersion'),
-              Text('New Version: $_newFirmwareVersion'),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Done'),
-              )
-            ],
-          ),
-        );
-      case OtaUpdateState.failure:
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error, color: Colors.red, size: 50),
-              const SizedBox(height: 16),
-              const Text('Update Failed', style: TextStyle(fontSize: 20)),
-              const SizedBox(height: 8),
-              Text(_errorMessage ?? 'An unknown error occurred.'),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              )
-            ],
-          ),
-        );
+    switch (otaStatus) {
+      case OtaStatus.checking:
+        return _buildStatusIndicator('Checking for updates...');
+      case OtaStatus.noUpdate:
+        return _buildFailureUI('No update available.');
+      case OtaStatus.downloading:
+        return _buildStatusIndicator('Downloading firmware...');
+      case OtaStatus.success:
+        return _buildSuccessUI();
+      case OtaStatus.failure:
+        return _buildFailureUI('Firmware update failed.');
+      case OtaStatus.idle:
+      default:
+        return _buildIdleUI(smartShunt.firmwareVersion);
     }
   }
 
-  Widget _buildIdleUI() {
+  Widget _buildStatusIndicator(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(message),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuccessUI() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.check_circle, color: Colors.green, size: 50),
+          const SizedBox(height: 16),
+          const Text('Update Successful!', style: TextStyle(fontSize: 20)),
+          const SizedBox(height: 8),
+          const Text('Device will restart shortly.'),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Done'),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFailureUI(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error, color: Colors.red, size: 50),
+          const SizedBox(height: 16),
+          const Text('Update Failed', style: TextStyle(fontSize: 20)),
+          const SizedBox(height: 8),
+          Text(message),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () {
+              _bleService.resetOtaStatus();
+            },
+            child: const Text('Try Again'),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdleUI(String firmwareVersion) {
     return Column(
       children: [
-        Text('Current Firmware Version: $_initialFirmwareVersion'),
+        Text('Current Firmware Version: $firmwareVersion'),
         const SizedBox(height: 24),
         TextField(
           controller: _ssidController,
@@ -265,7 +181,16 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: _buildBody(),
+        child: StreamBuilder<SmartShunt>(
+          stream: _bleService.smartShuntStream,
+          initialData: _bleService.currentSmartShunt,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return _buildBody(snapshot.data!);
+          },
+        ),
       ),
     );
   }
