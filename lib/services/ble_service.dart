@@ -165,15 +165,19 @@ class BleService extends ChangeNotifier {
   }
 
   Future<void> startOtaUpdate(String ssid, String password) async {
-    if (_wifiSsidCharacteristic != null) {
-      await _wifiSsidCharacteristic!.write(utf8.encode(ssid));
+    if (_wifiSsidCharacteristic == null) {
+      throw Exception('WiFi SSID characteristic not found');
     }
-    if (_wifiPassCharacteristic != null) {
-      await _wifiPassCharacteristic!.write(utf8.encode(password));
+    if (_wifiPassCharacteristic == null) {
+      throw Exception('WiFi Password characteristic not found');
     }
-    if (_otaTriggerCharacteristic != null) {
-      await _otaTriggerCharacteristic!.write([0x01]);
+    if (_otaTriggerCharacteristic == null) {
+      throw Exception('OTA Trigger characteristic not found');
     }
+
+    await _wifiSsidCharacteristic!.write(utf8.encode(ssid));
+    await _wifiPassCharacteristic!.write(utf8.encode(password));
+    await _otaTriggerCharacteristic!.write([0x01]);
   }
 
   void _updateSmartShuntData(Guid characteristicUuid, List<int> value) {
