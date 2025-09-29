@@ -1,17 +1,17 @@
 import 'dart:async';
 
 import 'package:ae_ble_app/models/smart_shunt.dart';
+import 'package:ae_ble_app/screens/ota_update_screen.dart';
 import 'package:ae_ble_app/screens/settings_screen.dart';
 import 'package:ae_ble_app/services/ble_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:provider/provider.dart';
 
 class DeviceScreen extends StatefulWidget {
   final BluetoothDevice device;
-  final BleService bleService;
 
-  const DeviceScreen(
-      {super.key, required this.device, required this.bleService});
+  const DeviceScreen({super.key, required this.device});
 
   @override
   State<DeviceScreen> createState() => _DeviceScreenState();
@@ -20,17 +20,30 @@ class DeviceScreen extends StatefulWidget {
 class _DeviceScreenState extends State<DeviceScreen> {
   late final StreamSubscription<BluetoothConnectionState>
       _connectionStateSubscription;
+  late final StreamSubscription<SmartShunt> _smartShuntSubscription;
+  late final BleService _bleService;
+  bool _updateCheckPerformed = false;
 
   @override
   void initState() {
     super.initState();
+    _bleService = Provider.of<BleService>(context, listen: false);
+
     _connectionStateSubscription =
         widget.device.connectionState.listen((state) {
       if (state == BluetoothConnectionState.disconnected) {
-        // Pop the screen when the device disconnects
         if (mounted) {
           Navigator.of(context).pop();
         }
+      }
+    });
+
+    _smartShuntSubscription = _bleService.smartShuntStream.listen((smartShunt) {
+      if (!_updateCheckPerformed &&
+          smartShunt.firmwareVersion.isNotEmpty &&
+          smartShunt.updateUrl.isNotEmpty) {
+        _updateCheckPerformed = true;
+        _checkForUpdate();
       }
     });
   }
@@ -38,7 +51,29 @@ class _DeviceScreenState extends State<DeviceScreen> {
   @override
   void dispose() {
     _connectionStateSubscription.cancel();
+    _smartShuntSubscription.cancel();
     super.dispose();
+  }
+
+  Future<void> _checkForUpdate() async {
+    final latestVersion = await _bleService.checkForUpdate();
+    if (latestVersion != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('New firmware ($latestVersion) is available.'),
+          action: SnackBarAction(
+            label: 'Update',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const OtaUpdateScreen(),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -49,7 +84,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       ),
       body: SafeArea(
         child: StreamBuilder<SmartShunt>(
-          stream: widget.bleService.smartShuntStream,
+          stream: _bleService.smartShuntStream,
           builder: (context, snapshot) {
             if (snapshot.hasData) {
               final smartShunt = snapshot.data!;
@@ -135,11 +170,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => SettingsScreen(
-                                  bleService: widget.bleService,
-                                  smartShuntStream:
-                                      widget.bleService.smartShuntStream,
-                                ),
+                                builder: (context) => const SettingsScreen(),
                               ),
                             );
                           },

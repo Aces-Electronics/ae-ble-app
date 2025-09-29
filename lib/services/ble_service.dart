@@ -3,20 +3,31 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:ae_ble_app/models/smart_shunt.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:http/http.dart' as http;
 
-class BleService {
+class BleService extends ChangeNotifier {
   final StreamController<SmartShunt> _smartShuntController =
       StreamController<SmartShunt>.broadcast();
   Stream<SmartShunt> get smartShuntStream => _smartShuntController.stream;
 
   SmartShunt _currentSmartShunt = SmartShunt();
+  SmartShunt get currentSmartShunt => _currentSmartShunt;
   BluetoothDevice? _device;
   BluetoothCharacteristic? _loadControlCharacteristic;
   BluetoothCharacteristic? _setSocCharacteristic;
   BluetoothCharacteristic? _setVoltageProtectionCharacteristic;
   BluetoothCharacteristic? _setLowVoltageDisconnectDelayCharacteristic;
   BluetoothCharacteristic? _setDeviceNameSuffixCharacteristic;
+  BluetoothCharacteristic? _wifiSsidCharacteristic;
+  BluetoothCharacteristic? _wifiPassCharacteristic;
+  BluetoothCharacteristic? _otaTriggerCharacteristic;
+  BluetoothCharacteristic? _firmwareVersionCharacteristic;
+  BluetoothCharacteristic? _updateUrlCharacteristic;
+  BluetoothCharacteristic? _otaStatusCharacteristic;
+
+  BluetoothDevice? getDevice() => _device;
 
   void dispose() {
     _smartShuntController.close();
@@ -69,10 +80,48 @@ class BleService {
             _setLowVoltageDisconnectDelayCharacteristic = characteristic;
           } else if (characteristic.uuid == DEVICE_NAME_SUFFIX_UUID) {
             _setDeviceNameSuffixCharacteristic = characteristic;
+          } else if (characteristic.uuid == WIFI_SSID_CHAR_UUID) {
+            _wifiSsidCharacteristic = characteristic;
+          } else if (characteristic.uuid == WIFI_PASS_CHAR_UUID) {
+            _wifiPassCharacteristic = characteristic;
+          } else if (characteristic.uuid == OTA_TRIGGER_CHAR_UUID) {
+            _otaTriggerCharacteristic = characteristic;
+          } else if (characteristic.uuid == FIRMWARE_VERSION_UUID) {
+            _firmwareVersionCharacteristic = characteristic;
+          } else if (characteristic.uuid == UPDATE_URL_CHAR_UUID) {
+            _updateUrlCharacteristic = characteristic;
+          } else if (characteristic.uuid == OTA_STATUS_CHAR_UUID) {
+            _otaStatusCharacteristic = characteristic;
           }
         }
       }
     }
+  }
+
+  Future<String?> checkForUpdate() async {
+    if (_currentSmartShunt.firmwareVersion.isEmpty ||
+        _currentSmartShunt.updateUrl.isEmpty) {
+      return null;
+    }
+
+    try {
+      final url = Uri.parse(
+          'https://api.github.com/repos/${_currentSmartShunt.updateUrl}/releases/latest');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final latestVersion = jsonResponse['tag_name'];
+        if (latestVersion != null &&
+            latestVersion != _currentSmartShunt.firmwareVersion) {
+          return latestVersion;
+        }
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('Failed to check for updates: $e');
+    }
+    return null;
   }
 
   Future<void> setLoadState(bool enabled) async {
@@ -113,6 +162,22 @@ class BleService {
     if (_setDeviceNameSuffixCharacteristic != null) {
       await _setDeviceNameSuffixCharacteristic!.write(utf8.encode(suffix));
     }
+  }
+
+  Future<void> startOtaUpdate(String ssid, String password) async {
+    if (_wifiSsidCharacteristic == null) {
+      throw Exception('WiFi SSID characteristic not found');
+    }
+    if (_wifiPassCharacteristic == null) {
+      throw Exception('WiFi Password characteristic not found');
+    }
+    if (_otaTriggerCharacteristic == null) {
+      throw Exception('OTA Trigger characteristic not found');
+    }
+
+    await _wifiSsidCharacteristic!.write(utf8.encode(ssid));
+    await _wifiPassCharacteristic!.write(utf8.encode(password));
+    await _otaTriggerCharacteristic!.write([0x01]);
   }
 
   void _updateSmartShuntData(Guid characteristicUuid, List<int> value) {
@@ -194,7 +259,63 @@ class BleService {
       } catch (e) {
         // Gracefully handle the error to prevent a crash
       }
+    } else if (characteristicUuid == FIRMWARE_VERSION_UUID) {
+      try {
+        final nullTerminatorIndex = value.indexOf(0);
+        final actualValue = nullTerminatorIndex != -1
+            ? value.sublist(0, nullTerminatorIndex)
+            : value;
+        _currentSmartShunt = _currentSmartShunt.copyWith(
+            firmwareVersion: utf8.decode(actualValue));
+      } catch (e) {
+        // Gracefully handle the error to prevent a crash
+      }
+    } else if (characteristicUuid == UPDATE_URL_CHAR_UUID) {
+      try {
+        final nullTerminatorIndex = value.indexOf(0);
+        final actualValue = nullTerminatorIndex != -1
+            ? value.sublist(0, nullTerminatorIndex)
+            : value;
+        _currentSmartShunt =
+            _currentSmartShunt.copyWith(updateUrl: utf8.decode(actualValue));
+      } catch (e) {
+        // Gracefully handle the error to prevent a crash
+      }
+    } else if (characteristicUuid == OTA_STATUS_CHAR_UUID) {
+      try {
+        final statusString = utf8.decode(value);
+        OtaStatus status;
+        switch (statusString) {
+          case "CHECKING":
+            status = OtaStatus.checking;
+            break;
+          case "NO_UPDATE":
+            status = OtaStatus.noUpdate;
+            break;
+          case "DOWNLOADING":
+            status = OtaStatus.downloading;
+            break;
+          case "SUCCESS":
+            status = OtaStatus.success;
+            break;
+          case "FAILURE":
+            status = OtaStatus.failure;
+            break;
+          default:
+            status = OtaStatus.idle;
+        }
+        _currentSmartShunt = _currentSmartShunt.copyWith(otaStatus: status);
+      } catch (e) {
+        // Gracefully handle the error
+      }
     }
     _smartShuntController.add(_currentSmartShunt);
+    notifyListeners();
+  }
+
+  void resetOtaStatus() {
+    _currentSmartShunt = _currentSmartShunt.copyWith(otaStatus: OtaStatus.idle);
+    _smartShuntController.add(_currentSmartShunt);
+    notifyListeners();
   }
 }

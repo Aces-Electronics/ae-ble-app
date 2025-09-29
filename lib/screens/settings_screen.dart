@@ -1,18 +1,17 @@
 import 'package:ae_ble_app/models/smart_shunt.dart';
+import 'package:ae_ble_app/screens/ota_update_screen.dart';
 import 'package:ae_ble_app/services/ble_service.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class SettingsScreen extends StatelessWidget {
-  final BleService bleService;
-  final Stream<SmartShunt> smartShuntStream;
-
-  const SettingsScreen(
-      {super.key, required this.bleService, required this.smartShuntStream});
+  const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final bleService = Provider.of<BleService>(context);
     return StreamBuilder<SmartShunt>(
-        stream: smartShuntStream,
+        stream: bleService.smartShuntStream,
         builder: (context, snapshot) {
           final smartShunt = snapshot.data;
           if (smartShunt == null) {
@@ -43,14 +42,14 @@ class SettingsScreen extends StatelessWidget {
                   title: const Text('Set State of Charge (SOC)'),
                   subtitle:
                       Text('${(smartShunt.soc).toStringAsFixed(1)} %'),
-                  onTap: () => _showSetSocDialog(context, smartShunt),
+                  onTap: () => _showSetSocDialog(context, smartShunt, bleService),
                 ),
                 ListTile(
                   title: const Text('Set Voltage Protection'),
                   subtitle: Text(
                       'Cutoff: ${smartShunt.cutoffVoltage.toStringAsFixed(2)} V, Reconnect: ${smartShunt.reconnectVoltage.toStringAsFixed(2)} V'),
-                  onTap: () =>
-                      _showSetVoltageProtectionDialog(context, smartShunt),
+                  onTap: () => _showSetVoltageProtectionDialog(
+                      context, smartShunt, bleService),
                 ),
                 ListTile(
                   title: const Text('Low-Voltage Disconnect Delay'),
@@ -63,8 +62,20 @@ class SettingsScreen extends StatelessWidget {
                   subtitle: Text(smartShunt.deviceNameSuffix.isNotEmpty
                       ? smartShunt.deviceNameSuffix
                       : 'Not Set'),
-                  onTap: () =>
-                      _showSetDeviceNameSuffixDialog(context, smartShunt),
+                  onTap: () => _showSetDeviceNameSuffixDialog(
+                      context, smartShunt, bleService),
+                ),
+                const Divider(),
+                ListTile(
+                  title: const Text('Firmware Update'),
+                  leading: const Icon(Icons.system_update),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const OtaUpdateScreen(),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -72,7 +83,8 @@ class SettingsScreen extends StatelessWidget {
         });
   }
 
-  void _showSetSocDialog(BuildContext context, SmartShunt smartShunt) {
+  void _showSetSocDialog(
+      BuildContext context, SmartShunt smartShunt, BleService bleService) {
     final socController =
         TextEditingController(text: smartShunt.soc.toStringAsFixed(1));
     showDialog(
@@ -110,7 +122,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showSetVoltageProtectionDialog(
-      BuildContext context, SmartShunt smartShunt) {
+      BuildContext context, SmartShunt smartShunt, BleService bleService) {
     final cutoffController = TextEditingController(
         text: smartShunt.cutoffVoltage.toStringAsFixed(2));
     final reconnectController = TextEditingController(
@@ -197,7 +209,6 @@ class SettingsScreen extends StatelessWidget {
         return AlertDialog(
           title: const Text('Set Low-Voltage Disconnect Delay'),
           content: LowVoltageDelayDropdown(
-            bleService: bleService,
             initialDelay: smartShunt.lowVoltageDisconnectDelay,
           ),
           actions: [
@@ -212,7 +223,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showSetDeviceNameSuffixDialog(
-      BuildContext context, SmartShunt smartShunt) {
+      BuildContext context, SmartShunt smartShunt, BleService bleService) {
     final suffixController =
         TextEditingController(text: smartShunt.deviceNameSuffix);
     showDialog(
@@ -248,11 +259,9 @@ class SettingsScreen extends StatelessWidget {
 }
 
 class LowVoltageDelayDropdown extends StatefulWidget {
-  final BleService bleService;
   final int initialDelay;
 
-  const LowVoltageDelayDropdown(
-      {super.key, required this.bleService, required this.initialDelay});
+  const LowVoltageDelayDropdown({super.key, required this.initialDelay});
 
   @override
   State<LowVoltageDelayDropdown> createState() =>
@@ -282,9 +291,10 @@ class _LowVoltageDelayDropdownState extends State<LowVoltageDelayDropdown> {
     if (selectedOption == null) return;
 
     final int seconds = delayOptions[selectedOption]!;
+    final bleService = Provider.of<BleService>(context, listen: false);
 
     try {
-      await widget.bleService.setLowVoltageDisconnectDelay(seconds);
+      await bleService.setLowVoltageDisconnectDelay(seconds);
       setState(() {
         _currentDelay = seconds;
       });
