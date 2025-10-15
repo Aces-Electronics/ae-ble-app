@@ -195,8 +195,11 @@ class BleService extends ChangeNotifier {
       _currentSmartShunt = _currentSmartShunt.copyWith(
           batteryPower: byteData.getFloat32(0, Endian.little));
     } else if (characteristicUuid == SOC_UUID) {
-      _currentSmartShunt =
-          _currentSmartShunt.copyWith(soc: byteData.getFloat32(0, Endian.little));
+      double soc = byteData.getFloat32(0, Endian.little);
+      if (soc >= 0.0 && soc <= 1.0) {
+        soc *= 100;
+      }
+      _currentSmartShunt = _currentSmartShunt.copyWith(soc: soc);
     } else if (characteristicUuid == REMAINING_CAPACITY_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
           remainingCapacity: byteData.getFloat32(0, Endian.little));
