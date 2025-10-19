@@ -77,8 +77,11 @@ class BleService extends ChangeNotifier {
           }
 
           // Read initial value if the characteristic has the read property
-          if (characteristic.properties.read) {
-            await characteristic.read();
+          // Do not read Release Metadata during initial discovery.
+          if (characteristic.properties.read &&
+              characteristic.uuid != RELEASE_METADATA_UUID) {
+            final value = await characteristic.read();
+            await _updateSmartShuntData(characteristic.uuid, value);
           }
           if (characteristic.uuid == LOAD_CONTROL_UUID) {
             _loadControlCharacteristic = characteristic;
