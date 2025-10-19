@@ -18,6 +18,7 @@ class BleService extends ChangeNotifier {
       _releaseMetadataController.stream;
 
   SmartShunt _currentSmartShunt = SmartShunt();
+  bool _isFetchingMetadata = false;
   SmartShunt get currentSmartShunt => _currentSmartShunt;
   BluetoothDevice? _device;
   BluetoothCharacteristic? _loadControlCharacteristic;
@@ -275,9 +276,14 @@ class BleService extends ChangeNotifier {
         print('OTA LOG: Received Update Status notification: $statusValue');
         final status = OtaStatus.values[statusValue];
         _currentSmartShunt = _currentSmartShunt.copyWith(otaStatus: status);
-        if (status == OtaStatus.updateAvailable) {
-          print('OTA LOG: Update available. Reading Release Metadata...');
-          await _readReleaseMetadata();
+        if (status == OtaStatus.updateAvailable && !_isFetchingMetadata) {
+          _isFetchingMetadata = true;
+          try {
+            print('OTA LOG: Update available. Reading Release Metadata...');
+            await _readReleaseMetadata();
+          } finally {
+            _isFetchingMetadata = false;
+          }
         }
       }
     } else if (characteristicUuid == PROGRESS_UUID) {
