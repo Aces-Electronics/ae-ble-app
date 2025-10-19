@@ -93,7 +93,8 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
       case OtaStatus.postRebootSuccessConfirmation:
         return _buildSuccessUI(isFinal: true);
       case OtaStatus.updateFailed:
-        return _buildFailureUI('Firmware update failed.');
+        return _buildFailureUI('Firmware update failed.',
+            details: smartShunt.otaErrorMessage);
       case OtaStatus.idle:
       default:
         return _buildIdleUI(smartShunt.firmwareVersion);
@@ -174,7 +175,7 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
     );
   }
 
-  Widget _buildFailureUI(String message) {
+  Widget _buildFailureUI(String message, {String? details}) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -183,7 +184,7 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
           const SizedBox(height: 16),
           const Text('Update Failed', style: TextStyle(fontSize: 20)),
           const SizedBox(height: 8),
-          Text(message),
+          Text(details ?? message),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () {

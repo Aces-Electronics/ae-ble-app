@@ -55,6 +55,7 @@ class SmartShunt {
   final String updateUrl;
   final OtaStatus otaStatus;
   final int otaProgress;
+  final String? otaErrorMessage;
 
   SmartShunt({
     this.batteryVoltage = 0.0,
@@ -77,6 +78,7 @@ class SmartShunt {
     this.updateUrl = '',
     this.otaStatus = OtaStatus.idle,
     this.otaProgress = 0,
+    this.otaErrorMessage,
   });
 
   // Add a copyWith method to easily update the state
@@ -101,6 +103,7 @@ class SmartShunt {
     String? updateUrl,
     OtaStatus? otaStatus,
     int? otaProgress,
+    String? otaErrorMessage,
   }) {
     return SmartShunt(
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
@@ -125,12 +128,13 @@ class SmartShunt {
       updateUrl: updateUrl ?? this.updateUrl,
       otaStatus: otaStatus ?? this.otaStatus,
       otaProgress: otaProgress ?? this.otaProgress,
+      otaErrorMessage: otaErrorMessage ?? this.otaErrorMessage,
     );
   }
 
   @override
   String toString() {
-    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage, lastHourWh: $lastHourWh, lastDayWh: $lastDayWh, lastWeekWh: $lastWeekWh, lowVoltageDisconnectDelay: $lowVoltageDisconnectDelay, deviceNameSuffix: $deviceNameSuffix, firmwareVersion: $firmwareVersion, updateUrl: $updateUrl, otaStatus: $otaStatus, otaProgress: $otaProgress)';
+    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage, lastHourWh: $lastHourWh, lastDayWh: $lastDayWh, lastWeekWh: $lastWeekWh, lowVoltageDisconnectDelay: $lowVoltageDisconnectDelay, deviceNameSuffix: $deviceNameSuffix, firmwareVersion: $firmwareVersion, updateUrl: $updateUrl, otaStatus: $otaStatus, otaProgress: $otaProgress, otaErrorMessage: $otaErrorMessage)';
   }
 }
 

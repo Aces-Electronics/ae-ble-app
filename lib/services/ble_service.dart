@@ -294,9 +294,11 @@ class BleService extends ChangeNotifier {
     try {
       final value = await _releaseMetadataCharacteristic!.read();
       if (value.isEmpty) {
-        print('OTA LOG: Received empty Release Metadata, treating as failure.');
-        _currentSmartShunt =
-            _currentSmartShunt.copyWith(otaStatus: OtaStatus.updateFailed);
+        _currentSmartShunt = _currentSmartShunt.copyWith(
+          otaStatus: OtaStatus.updateFailed,
+          otaErrorMessage:
+              'Failed to retrieve update details from the device. Please try again.',
+        );
         _smartShuntController.add(_currentSmartShunt);
         notifyListeners();
         return;
