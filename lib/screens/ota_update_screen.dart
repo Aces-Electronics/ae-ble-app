@@ -47,12 +47,14 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
     super.dispose();
   }
 
-  void _checkForUpdate() {
-    _bleService.setWifiCredentials(
+  Future<void> _checkForUpdate() async {
+    await _bleService.setWifiCredentials(
       _ssidController.text,
       _passwordController.text,
     );
-    _bleService.checkForUpdate();
+    // Add a small delay to ensure credentials are processed before next command
+    await Future.delayed(const Duration(milliseconds: 200));
+    await _bleService.checkForUpdate();
   }
 
   void _startUpdate() {
