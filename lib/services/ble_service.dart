@@ -12,6 +12,11 @@ class BleService extends ChangeNotifier {
       StreamController<SmartShunt>.broadcast();
   Stream<SmartShunt> get smartShuntStream => _smartShuntController.stream;
 
+  final StreamController<ReleaseMetadata> _releaseMetadataController =
+      StreamController<ReleaseMetadata>.broadcast();
+  Stream<ReleaseMetadata> get releaseMetadataStream =>
+      _releaseMetadataController.stream;
+
   SmartShunt _currentSmartShunt = SmartShunt();
   SmartShunt get currentSmartShunt => _currentSmartShunt;
   BluetoothDevice? _device;
@@ -20,12 +25,12 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _setVoltageProtectionCharacteristic;
   BluetoothCharacteristic? _setLowVoltageDisconnectDelayCharacteristic;
   BluetoothCharacteristic? _setDeviceNameSuffixCharacteristic;
-  BluetoothCharacteristic? _wifiSsidCharacteristic;
-  BluetoothCharacteristic? _wifiPassCharacteristic;
-  BluetoothCharacteristic? _otaTriggerCharacteristic;
-  BluetoothCharacteristic? _firmwareVersionCharacteristic;
-  BluetoothCharacteristic? _updateUrlCharacteristic;
-  BluetoothCharacteristic? _otaStatusCharacteristic;
+  // OTA
+  BluetoothCharacteristic? _currentVersionCharacteristic;
+  BluetoothCharacteristic? _updateStatusCharacteristic;
+  BluetoothCharacteristic? _updateControlCharacteristic;
+  BluetoothCharacteristic? _releaseMetadataCharacteristic;
+  BluetoothCharacteristic? _progressCharacteristic;
 
   BluetoothDevice? getDevice() => _device;
 
@@ -55,8 +60,9 @@ class BleService extends ChangeNotifier {
     print('Found ${services.length} services');
     for (BluetoothService service in services) {
       print('Service: ${service.uuid}');
-      if (service.uuid == SMART_SHUNT_SERVICE_UUID) {
-        print('Found Smart Shunt service');
+      if (service.uuid == SMART_SHUNT_SERVICE_UUID ||
+          service.uuid == OTA_SERVICE_UUID) {
+        print('Found matching service');
         for (BluetoothCharacteristic characteristic in service.characteristics) {
           print('Characteristic: ${characteristic.uuid}');
           if (characteristic.properties.read ||
@@ -80,48 +86,27 @@ class BleService extends ChangeNotifier {
             _setLowVoltageDisconnectDelayCharacteristic = characteristic;
           } else if (characteristic.uuid == DEVICE_NAME_SUFFIX_UUID) {
             _setDeviceNameSuffixCharacteristic = characteristic;
-          } else if (characteristic.uuid == WIFI_SSID_CHAR_UUID) {
-            _wifiSsidCharacteristic = characteristic;
-          } else if (characteristic.uuid == WIFI_PASS_CHAR_UUID) {
-            _wifiPassCharacteristic = characteristic;
-          } else if (characteristic.uuid == OTA_TRIGGER_CHAR_UUID) {
-            _otaTriggerCharacteristic = characteristic;
-          } else if (characteristic.uuid == FIRMWARE_VERSION_UUID) {
-            _firmwareVersionCharacteristic = characteristic;
-          } else if (characteristic.uuid == UPDATE_URL_CHAR_UUID) {
-            _updateUrlCharacteristic = characteristic;
-          } else if (characteristic.uuid == OTA_STATUS_CHAR_UUID) {
-            _otaStatusCharacteristic = characteristic;
+          } else if (characteristic.uuid == CURRENT_VERSION_UUID) {
+            _currentVersionCharacteristic = characteristic;
+          } else if (characteristic.uuid == UPDATE_STATUS_UUID) {
+            _updateStatusCharacteristic = characteristic;
+          } else if (characteristic.uuid == UPDATE_CONTROL_UUID) {
+            _updateControlCharacteristic = characteristic;
+          } else if (characteristic.uuid == RELEASE_METADATA_UUID) {
+            _releaseMetadataCharacteristic = characteristic;
+          } else if (characteristic.uuid == PROGRESS_UUID) {
+            _progressCharacteristic = characteristic;
           }
         }
       }
     }
   }
 
-  Future<String?> checkForUpdate() async {
-    if (_currentSmartShunt.firmwareVersion.isEmpty ||
-        _currentSmartShunt.updateUrl.isEmpty) {
-      return null;
+  Future<void> checkForUpdate() async {
+    if (_updateControlCharacteristic != null) {
+      await _updateControlCharacteristic!.write([1]);
     }
 
-    try {
-      final url = Uri.parse(
-          'https://api.github.com/repos/${_currentSmartShunt.updateUrl}/releases/latest');
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        final latestVersion = jsonResponse['tag_name'];
-        if (latestVersion != null &&
-            latestVersion != _currentSmartShunt.firmwareVersion) {
-          return latestVersion;
-        }
-      }
-    } catch (e) {
-      // ignore: avoid_print
-      print('Failed to check for updates: $e');
-    }
-    return null;
   }
 
   Future<void> setLoadState(bool enabled) async {
@@ -164,20 +149,10 @@ class BleService extends ChangeNotifier {
     }
   }
 
-  Future<void> startOtaUpdate(String ssid, String password) async {
-    if (_wifiSsidCharacteristic == null) {
-      throw Exception('WiFi SSID characteristic not found');
+  Future<void> startOtaUpdate() async {
+    if (_updateControlCharacteristic != null) {
+      await _updateControlCharacteristic!.write([2]);
     }
-    if (_wifiPassCharacteristic == null) {
-      throw Exception('WiFi Password characteristic not found');
-    }
-    if (_otaTriggerCharacteristic == null) {
-      throw Exception('OTA Trigger characteristic not found');
-    }
-
-    await _wifiSsidCharacteristic!.write(utf8.encode(ssid));
-    await _wifiPassCharacteristic!.write(utf8.encode(password));
-    await _otaTriggerCharacteristic!.write([0x01]);
   }
 
   void _updateSmartShuntData(Guid characteristicUuid, List<int> value) {
@@ -262,7 +237,7 @@ class BleService extends ChangeNotifier {
       } catch (e) {
         // Gracefully handle the error to prevent a crash
       }
-    } else if (characteristicUuid == FIRMWARE_VERSION_UUID) {
+    } else if (characteristicUuid == CURRENT_VERSION_UUID) {
       try {
         final nullTerminatorIndex = value.indexOf(0);
         final actualValue = nullTerminatorIndex != -1
@@ -273,43 +248,26 @@ class BleService extends ChangeNotifier {
       } catch (e) {
         // Gracefully handle the error to prevent a crash
       }
-    } else if (characteristicUuid == UPDATE_URL_CHAR_UUID) {
-      try {
-        final nullTerminatorIndex = value.indexOf(0);
-        final actualValue = nullTerminatorIndex != -1
-            ? value.sublist(0, nullTerminatorIndex)
-            : value;
-        _currentSmartShunt =
-            _currentSmartShunt.copyWith(updateUrl: utf8.decode(actualValue));
-      } catch (e) {
-        // Gracefully handle the error to prevent a crash
-      }
-    } else if (characteristicUuid == OTA_STATUS_CHAR_UUID) {
-      try {
-        final statusString = utf8.decode(value);
-        OtaStatus status;
-        switch (statusString) {
-          case "CHECKING":
-            status = OtaStatus.checking;
-            break;
-          case "NO_UPDATE":
-            status = OtaStatus.noUpdate;
-            break;
-          case "DOWNLOADING":
-            status = OtaStatus.downloading;
-            break;
-          case "SUCCESS":
-            status = OtaStatus.success;
-            break;
-          case "FAILURE":
-            status = OtaStatus.failure;
-            break;
-          default:
-            status = OtaStatus.idle;
-        }
+    } else if (characteristicUuid == UPDATE_STATUS_UUID) {
+      if (value.isNotEmpty) {
+        final status = OtaStatus.values[value[0]];
         _currentSmartShunt = _currentSmartShunt.copyWith(otaStatus: status);
+        if (status == OtaStatus.updateAvailable) {
+          _releaseMetadataCharacteristic?.read();
+        }
+      }
+    } else if (characteristicUuid == RELEASE_METADATA_UUID) {
+      try {
+        final metadataJson = jsonDecode(utf8.decode(value));
+        final metadata = ReleaseMetadata.fromJson(metadataJson);
+        _releaseMetadataController.add(metadata);
       } catch (e) {
         // Gracefully handle the error
+      }
+    } else if (characteristicUuid == PROGRESS_UUID) {
+      if (value.isNotEmpty) {
+        _currentSmartShunt =
+            _currentSmartShunt.copyWith(otaProgress: value[0]);
       }
     }
     _smartShuntController.add(_currentSmartShunt);
@@ -320,5 +278,29 @@ class BleService extends ChangeNotifier {
     _currentSmartShunt = _currentSmartShunt.copyWith(otaStatus: OtaStatus.idle);
     _smartShuntController.add(_currentSmartShunt);
     notifyListeners();
+  }
+
+  Future<void> reconnectToLastDevice() async {
+    if (_device == null) {
+      print('No device to reconnect to.');
+      return;
+    }
+    print('Attempting to reconnect to ${_device!.remoteId}');
+
+    // Start scanning
+    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+
+    // Listen for scan results
+    await for (var results in FlutterBluePlus.scanResults) {
+      for (ScanResult r in results) {
+        if (r.device.remoteId == _device!.remoteId) {
+          print('Found device, stopping scan and connecting...');
+          await FlutterBluePlus.stopScan();
+          await connectToDevice(r.device);
+          return; // Exit after finding and connecting
+        }
+      }
+    }
+    print('Could not find device to reconnect to.');
   }
 }

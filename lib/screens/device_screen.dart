@@ -20,9 +20,7 @@ class DeviceScreen extends StatefulWidget {
 class _DeviceScreenState extends State<DeviceScreen> {
   late final StreamSubscription<BluetoothConnectionState>
       _connectionStateSubscription;
-  late final StreamSubscription<SmartShunt> _smartShuntSubscription;
   late final BleService _bleService;
-  bool _updateCheckPerformed = false;
 
   @override
   void initState() {
@@ -37,43 +35,12 @@ class _DeviceScreenState extends State<DeviceScreen> {
         }
       }
     });
-
-    _smartShuntSubscription = _bleService.smartShuntStream.listen((smartShunt) {
-      if (!_updateCheckPerformed &&
-          smartShunt.firmwareVersion.isNotEmpty &&
-          smartShunt.updateUrl.isNotEmpty) {
-        _updateCheckPerformed = true;
-        _checkForUpdate();
-      }
-    });
   }
 
   @override
   void dispose() {
     _connectionStateSubscription.cancel();
-    _smartShuntSubscription.cancel();
     super.dispose();
-  }
-
-  Future<void> _checkForUpdate() async {
-    final latestVersion = await _bleService.checkForUpdate();
-    if (latestVersion != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('New firmware ($latestVersion) is available.'),
-          action: SnackBarAction(
-            label: 'Update',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const OtaUpdateScreen(),
-                ),
-              );
-            },
-          ),
-        ),
-      );
-    }
   }
 
   @override
@@ -161,20 +128,40 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.tune),
-                          title: const Text('Settings'),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SettingsScreen(),
-                              ),
-                            );
-                          },
-                        ),
+                      child: Column(
+                        children: [
+                          Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.tune),
+                              title: const Text('Settings'),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const SettingsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.upgrade),
+                              title: const Text('Firmware Update'),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const OtaUpdateScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
