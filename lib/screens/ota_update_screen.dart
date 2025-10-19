@@ -24,13 +24,10 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
   @override
   void initState() {
     super.initState();
-    print('DEBUG: OtaUpdateScreen initState');
     _bleService = Provider.of<BleService>(context, listen: false);
     _releaseMetadataSubscription =
         _bleService.releaseMetadataStream.listen((metadata) {
-      print('DEBUG: OtaUpdateScreen received metadata: $metadata');
       setState(() {
-        print('DEBUG: OtaUpdateScreen setState with new metadata');
         _releaseMetadata = metadata;
       });
     });
@@ -81,7 +78,6 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
 
   Widget _buildBody(SmartShunt smartShunt) {
     final otaStatus = smartShunt.otaStatus;
-    print('DEBUG: OtaUpdateScreen _buildBody with otaStatus: $otaStatus');
 
     switch (otaStatus) {
       case OtaStatus.checkingForUpdate:

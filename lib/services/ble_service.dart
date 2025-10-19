@@ -57,22 +57,19 @@ class BleService extends ChangeNotifier {
   }
 
   Future<void> discoverServices(BluetoothDevice device) async {
-    print('DEBUG: Discovering services for device: ${device.remoteId}');
+    print('Discovering services for device: ${device.remoteId}');
     List<BluetoothService> services = await device.discoverServices();
-    print('DEBUG: Found ${services.length} services');
+    print('Found ${services.length} services');
     for (BluetoothService service in services) {
-      print('DEBUG: Service: ${service.uuid}');
+      print('Service: ${service.uuid}');
       if (service.uuid == SMART_SHUNT_SERVICE_UUID ||
           service.uuid == OTA_SERVICE_UUID) {
-        print('DEBUG: Found matching service: ${service.uuid}');
+        print('Found matching service');
         for (BluetoothCharacteristic characteristic in service.characteristics) {
-          print(
-              'DEBUG: Characteristic: ${characteristic.uuid}, Properties: ${characteristic.properties}');
+          print('Characteristic: ${characteristic.uuid}');
 
           // Subscribe to notifications if the characteristic has the notify property
           if (characteristic.properties.notify) {
-            print(
-                'DEBUG: Subscribing to notifications for ${characteristic.uuid}');
             await characteristic.setNotifyValue(true);
             characteristic.lastValueStream.listen((value) {
               _updateSmartShuntData(characteristic.uuid, value);
@@ -81,7 +78,6 @@ class BleService extends ChangeNotifier {
 
           // Read initial value if the characteristic has the read property
           if (characteristic.properties.read) {
-            print('DEBUG: Reading initial value for ${characteristic.uuid}');
             await characteristic.read();
           }
           if (characteristic.uuid == LOAD_CONTROL_UUID) {
@@ -180,12 +176,7 @@ class BleService extends ChangeNotifier {
   }
 
   void _updateSmartShuntData(Guid characteristicUuid, List<int> value) {
-    print(
-        'DEBUG: _updateSmartShuntData received data for $characteristicUuid: $value');
-    if (value.isEmpty) {
-      print('DEBUG: Empty value received, returning.');
-      return;
-    }
+    if (value.isEmpty) return;
 
     ByteData byteData = ByteData.sublistView(Uint8List.fromList(value));
 
@@ -299,17 +290,15 @@ class BleService extends ChangeNotifier {
   }
 
   Future<void> _readReleaseMetadata() async {
-    print('DEBUG: _readReleaseMetadata called.');
-    if (_releaseMetadataCharacteristic == null) {
-      print('DEBUG: _releaseMetadataCharacteristic is null, returning.');
-      return;
-    }
+    if (_releaseMetadataCharacteristic == null) return;
     try {
-      print('DEBUG: Reading from _releaseMetadataCharacteristic...');
       final value = await _releaseMetadataCharacteristic!.read();
-      print('DEBUG: Read successful, value: $value');
       if (value.isEmpty) {
-        print('DEBUG: Read value is empty, returning.');
+        print('OTA LOG: Received empty Release Metadata, treating as failure.');
+        _currentSmartShunt =
+            _currentSmartShunt.copyWith(otaStatus: OtaStatus.updateFailed);
+        _smartShuntController.add(_currentSmartShunt);
+        notifyListeners();
         return;
       }
 
@@ -317,9 +306,7 @@ class BleService extends ChangeNotifier {
       print('OTA LOG: Received Release Metadata: $rawMetadata');
       final metadataJson = jsonDecode(rawMetadata);
       final metadata = ReleaseMetadata.fromJson(metadataJson);
-      print('DEBUG: Parsed metadata: $metadata');
       _releaseMetadataController.add(metadata);
-      print('DEBUG: Added metadata to stream.');
     } catch (e) {
       print('OTA LOG: Error reading or parsing Release Metadata: $e');
     }
