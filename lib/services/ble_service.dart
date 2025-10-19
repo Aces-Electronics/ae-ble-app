@@ -71,8 +71,8 @@ class BleService extends ChangeNotifier {
           // Subscribe to notifications if the characteristic has the notify property
           if (characteristic.properties.notify) {
             await characteristic.setNotifyValue(true);
-            characteristic.lastValueStream.listen((value) {
-              _updateSmartShuntData(characteristic.uuid, value);
+            characteristic.lastValueStream.listen((value) async {
+              await _updateSmartShuntData(characteristic.uuid, value);
             });
           }
 
@@ -175,7 +175,8 @@ class BleService extends ChangeNotifier {
     }
   }
 
-  void _updateSmartShuntData(Guid characteristicUuid, List<int> value) {
+  Future<void> _updateSmartShuntData(
+      Guid characteristicUuid, List<int> value) async {
     if (value.isEmpty) return;
 
     ByteData byteData = ByteData.sublistView(Uint8List.fromList(value));
@@ -276,7 +277,7 @@ class BleService extends ChangeNotifier {
         _currentSmartShunt = _currentSmartShunt.copyWith(otaStatus: status);
         if (status == OtaStatus.updateAvailable) {
           print('OTA LOG: Update available. Reading Release Metadata...');
-          _readReleaseMetadata();
+          await _readReleaseMetadata();
         }
       }
     } else if (characteristicUuid == PROGRESS_UUID) {
