@@ -273,18 +273,8 @@ class BleService extends ChangeNotifier {
         _currentSmartShunt = _currentSmartShunt.copyWith(otaStatus: status);
         if (status == OtaStatus.updateAvailable) {
           print('OTA LOG: Update available. Reading Release Metadata...');
-          _releaseMetadataCharacteristic?.read();
+          _readReleaseMetadata();
         }
-      }
-    } else if (characteristicUuid == RELEASE_METADATA_UUID) {
-      try {
-        final rawMetadata = utf8.decode(value);
-        print('OTA LOG: Received Release Metadata: $rawMetadata');
-        final metadataJson = jsonDecode(rawMetadata);
-        final metadata = ReleaseMetadata.fromJson(metadataJson);
-        _releaseMetadataController.add(metadata);
-      } catch (e) {
-        print('OTA LOG: Error parsing Release Metadata: $e');
       }
     } else if (characteristicUuid == PROGRESS_UUID) {
       if (value.isNotEmpty) {
@@ -294,6 +284,22 @@ class BleService extends ChangeNotifier {
     }
     _smartShuntController.add(_currentSmartShunt);
     notifyListeners();
+  }
+
+  Future<void> _readReleaseMetadata() async {
+    if (_releaseMetadataCharacteristic == null) return;
+    try {
+      final value = await _releaseMetadataCharacteristic!.read();
+      if (value.isEmpty) return;
+
+      final rawMetadata = utf8.decode(value);
+      print('OTA LOG: Received Release Metadata: $rawMetadata');
+      final metadataJson = jsonDecode(rawMetadata);
+      final metadata = ReleaseMetadata.fromJson(metadataJson);
+      _releaseMetadataController.add(metadata);
+    } catch (e) {
+      print('OTA LOG: Error reading or parsing Release Metadata: $e');
+    }
   }
 
   void resetOtaStatus() {
