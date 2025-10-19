@@ -25,6 +25,8 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _setVoltageProtectionCharacteristic;
   BluetoothCharacteristic? _setLowVoltageDisconnectDelayCharacteristic;
   BluetoothCharacteristic? _setDeviceNameSuffixCharacteristic;
+  BluetoothCharacteristic? _wifiSsidCharacteristic;
+  BluetoothCharacteristic? _wifiPassCharacteristic;
   // OTA
   BluetoothCharacteristic? _currentVersionCharacteristic;
   BluetoothCharacteristic? _updateStatusCharacteristic;
@@ -86,6 +88,10 @@ class BleService extends ChangeNotifier {
             _setLowVoltageDisconnectDelayCharacteristic = characteristic;
           } else if (characteristic.uuid == DEVICE_NAME_SUFFIX_UUID) {
             _setDeviceNameSuffixCharacteristic = characteristic;
+          } else if (characteristic.uuid == WIFI_SSID_CHAR_UUID) {
+            _wifiSsidCharacteristic = characteristic;
+          } else if (characteristic.uuid == WIFI_PASS_CHAR_UUID) {
+            _wifiPassCharacteristic = characteristic;
           } else if (characteristic.uuid == CURRENT_VERSION_UUID) {
             _currentVersionCharacteristic = characteristic;
           } else if (characteristic.uuid == UPDATE_STATUS_UUID) {
@@ -107,6 +113,15 @@ class BleService extends ChangeNotifier {
       await _updateControlCharacteristic!.write([1]);
     }
 
+  }
+
+  Future<void> setWifiCredentials(String ssid, String password) async {
+    if (_wifiSsidCharacteristic != null) {
+      await _wifiSsidCharacteristic!.write(utf8.encode(ssid));
+    }
+    if (_wifiPassCharacteristic != null) {
+      await _wifiPassCharacteristic!.write(utf8.encode(password));
+    }
   }
 
   Future<void> setLoadState(bool enabled) async {

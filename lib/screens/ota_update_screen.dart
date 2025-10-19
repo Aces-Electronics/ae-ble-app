@@ -14,6 +14,8 @@ class OtaUpdateScreen extends StatefulWidget {
 }
 
 class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
+  final _ssidController = TextEditingController();
+  final _passwordController = TextEditingController();
   late final BleService _bleService;
   StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
   StreamSubscription<ReleaseMetadata>? _releaseMetadataSubscription;
@@ -33,6 +35,8 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
 
   @override
   void dispose() {
+    _ssidController.dispose();
+    _passwordController.dispose();
     _connectionStateSubscription?.cancel();
     _releaseMetadataSubscription?.cancel();
     // Reset status on screen exit if update was not successful
@@ -44,6 +48,10 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
   }
 
   void _checkForUpdate() {
+    _bleService.setWifiCredentials(
+      _ssidController.text,
+      _passwordController.text,
+    );
     _bleService.checkForUpdate();
   }
 
@@ -191,6 +199,23 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
       children: [
         Text('Current Firmware Version: $firmwareVersion'),
         const SizedBox(height: 24),
+        TextField(
+          controller: _ssidController,
+          decoration: const InputDecoration(
+            labelText: 'WiFi SSID',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _passwordController,
+          decoration: const InputDecoration(
+            labelText: 'WiFi Password',
+            border: OutlineInputBorder(),
+          ),
+          obscureText: true,
+        ),
+        const SizedBox(height: 32),
         ElevatedButton(
           onPressed: _checkForUpdate,
           child: const Text('Check for Updates'),
