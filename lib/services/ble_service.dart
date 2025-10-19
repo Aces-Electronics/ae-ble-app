@@ -67,15 +67,18 @@ class BleService extends ChangeNotifier {
         print('Found matching service');
         for (BluetoothCharacteristic characteristic in service.characteristics) {
           print('Characteristic: ${characteristic.uuid}');
-          if (characteristic.properties.read ||
-              characteristic.properties.notify) {
+
+          // Subscribe to notifications if the characteristic has the notify property
+          if (characteristic.properties.notify) {
             await characteristic.setNotifyValue(true);
             characteristic.lastValueStream.listen((value) {
               _updateSmartShuntData(characteristic.uuid, value);
             });
-            if (characteristic.properties.read) {
-              await characteristic.read();
-            }
+          }
+
+          // Read initial value if the characteristic has the read property
+          if (characteristic.properties.read) {
+            await characteristic.read();
           }
           if (characteristic.uuid == LOAD_CONTROL_UUID) {
             _loadControlCharacteristic = characteristic;
