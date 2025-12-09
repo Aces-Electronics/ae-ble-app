@@ -19,6 +19,9 @@ class BleService extends ChangeNotifier {
 
   SmartShunt _currentSmartShunt = SmartShunt();
   bool _isFetchingMetadata = false;
+  final List<double> _currentHistory =
+      []; // For storing recent current values for averaging
+  static const int _historyWindowSize = 300; // 5 minute window at 1Hz roughly
   SmartShunt get currentSmartShunt => _currentSmartShunt;
   BluetoothDevice? _device;
   BluetoothCharacteristic? _loadControlCharacteristic;
@@ -66,7 +69,8 @@ class BleService extends ChangeNotifier {
       if (service.uuid == SMART_SHUNT_SERVICE_UUID ||
           service.uuid == OTA_SERVICE_UUID) {
         print('Found matching service');
-        for (BluetoothCharacteristic characteristic in service.characteristics) {
+        for (BluetoothCharacteristic characteristic
+            in service.characteristics) {
           print('Characteristic: ${characteristic.uuid}');
 
           // Subscribe to notifications if the characteristic has the notify property
@@ -87,8 +91,7 @@ class BleService extends ChangeNotifier {
             _setSocCharacteristic = characteristic;
           } else if (characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID) {
             _setVoltageProtectionCharacteristic = characteristic;
-          } else if (characteristic.uuid ==
-              LOW_VOLTAGE_DISCONNECT_DELAY_UUID) {
+          } else if (characteristic.uuid == LOW_VOLTAGE_DISCONNECT_DELAY_UUID) {
             _setLowVoltageDisconnectDelayCharacteristic = characteristic;
           } else if (characteristic.uuid == DEVICE_NAME_SUFFIX_UUID) {
             _setDeviceNameSuffixCharacteristic = characteristic;
@@ -117,7 +120,6 @@ class BleService extends ChangeNotifier {
       print('OTA LOG: Writing 1 to Update Control characteristic.');
       await _updateControlCharacteristic!.write([1]);
     }
-
   }
 
   Future<void> setWifiCredentials(String ssid, String password) async {
@@ -146,8 +148,7 @@ class BleService extends ChangeNotifier {
     }
   }
 
-  Future<void> setVoltageProtection(
-      double cutoff, double reconnect) async {
+  Future<void> setVoltageProtection(double cutoff, double reconnect) async {
     if (_setVoltageProtectionCharacteristic != null) {
       final value = '$cutoff,$reconnect';
       await _setVoltageProtectionCharacteristic!.write(value.codeUnits);
@@ -158,8 +159,9 @@ class BleService extends ChangeNotifier {
     if (_setLowVoltageDisconnectDelayCharacteristic != null) {
       final buffer = ByteData(4);
       buffer.setUint32(0, seconds, Endian.little);
-      await _setLowVoltageDisconnectDelayCharacteristic!
-          .write(buffer.buffer.asUint8List());
+      await _setLowVoltageDisconnectDelayCharacteristic!.write(
+        buffer.buffer.asUint8List(),
+      );
     }
   }
 
@@ -177,20 +179,62 @@ class BleService extends ChangeNotifier {
   }
 
   Future<void> _updateSmartShuntData(
-      Guid characteristicUuid, List<int> value) async {
+    Guid characteristicUuid,
+    List<int> value,
+  ) async {
     if (value.isEmpty) return;
 
     ByteData byteData = ByteData.sublistView(Uint8List.fromList(value));
 
     if (characteristicUuid == BATTERY_VOLTAGE_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
-          batteryVoltage: byteData.getFloat32(0, Endian.little));
+        batteryVoltage: byteData.getFloat32(0, Endian.little),
+      );
     } else if (characteristicUuid == BATTERY_CURRENT_UUID) {
+      final current = byteData.getFloat32(0, Endian.little);
+
+      // Update history for averaging
+      _currentHistory.add(current);
+      if (_currentHistory.length > _historyWindowSize) {
+        _currentHistory.removeAt(0);
+      }
+
+      double avgCurrent =
+          _currentHistory.reduce((a, b) => a + b) / _currentHistory.length;
+      int? timeRemainingSeconds;
+
+      // Calculate Time Remaining based on averaged current
+      // Using a threshold to avoid division by zero or noise
+      if (avgCurrent.abs() > 0.1) {
+        if (avgCurrent < 0) {
+          // Discharging: Time to Empty
+          // Hours = Ah / A
+          double hours =
+              _currentSmartShunt.remainingCapacity / avgCurrent.abs();
+          timeRemainingSeconds = (hours * 3600).round();
+        } else {
+          // Charging: Time to Full
+          // We need Total Capacity. Estimation: Remaining / SOC * 100
+          if (_currentSmartShunt.soc > 0) {
+            double totalCapacity =
+                _currentSmartShunt.remainingCapacity /
+                (_currentSmartShunt.soc / 100.0);
+            double neededAh =
+                totalCapacity - _currentSmartShunt.remainingCapacity;
+            double hours = neededAh / avgCurrent;
+            timeRemainingSeconds = (hours * 3600).round();
+          }
+        }
+      }
+
       _currentSmartShunt = _currentSmartShunt.copyWith(
-          batteryCurrent: byteData.getFloat32(0, Endian.little));
+        batteryCurrent: current,
+        timeRemaining: timeRemainingSeconds,
+      );
     } else if (characteristicUuid == BATTERY_POWER_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
-          batteryPower: byteData.getFloat32(0, Endian.little));
+        batteryPower: byteData.getFloat32(0, Endian.little),
+      );
     } else if (characteristicUuid == SOC_UUID) {
       double soc = byteData.getFloat32(0, Endian.little);
       if (soc >= 0.0 && soc <= 1.0) {
@@ -199,19 +243,24 @@ class BleService extends ChangeNotifier {
       _currentSmartShunt = _currentSmartShunt.copyWith(soc: soc);
     } else if (characteristicUuid == REMAINING_CAPACITY_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
-          remainingCapacity: byteData.getFloat32(0, Endian.little));
+        remainingCapacity: byteData.getFloat32(0, Endian.little),
+      );
     } else if (characteristicUuid == STARTER_BATTERY_VOLTAGE_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
-          starterBatteryVoltage: byteData.getFloat32(0, Endian.little));
+        starterBatteryVoltage: byteData.getFloat32(0, Endian.little),
+      );
     } else if (characteristicUuid == CALIBRATION_STATUS_UUID) {
-      _currentSmartShunt =
-          _currentSmartShunt.copyWith(isCalibrated: value[0] == 1);
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+        isCalibrated: value[0] == 1,
+      );
     } else if (characteristicUuid == ERROR_STATE_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
-          errorState: ErrorState.values[value[0]]);
+        errorState: ErrorState.values[value[0]],
+      );
     } else if (characteristicUuid == LOAD_STATE_UUID) {
-      _currentSmartShunt =
-          _currentSmartShunt.copyWith(loadState: value[0] == 1);
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+        loadState: value[0] == 1,
+      );
     } else if (characteristicUuid == SET_VOLTAGE_PROTECTION_UUID) {
       try {
         // The device sends a C-style string (null-terminated). Find the first null byte.
@@ -238,16 +287,20 @@ class BleService extends ChangeNotifier {
       }
     } else if (characteristicUuid == LAST_HOUR_WH_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
-          lastHourWh: byteData.getFloat32(0, Endian.little));
+        lastHourWh: byteData.getFloat32(0, Endian.little),
+      );
     } else if (characteristicUuid == LAST_DAY_WH_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
-          lastDayWh: byteData.getFloat32(0, Endian.little));
+        lastDayWh: byteData.getFloat32(0, Endian.little),
+      );
     } else if (characteristicUuid == LAST_WEEK_WH_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
-          lastWeekWh: byteData.getFloat32(0, Endian.little));
+        lastWeekWh: byteData.getFloat32(0, Endian.little),
+      );
     } else if (characteristicUuid == LOW_VOLTAGE_DISCONNECT_DELAY_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
-          lowVoltageDisconnectDelay: byteData.getUint32(0, Endian.little));
+        lowVoltageDisconnectDelay: byteData.getUint32(0, Endian.little),
+      );
     } else if (characteristicUuid == DEVICE_NAME_SUFFIX_UUID) {
       try {
         final nullTerminatorIndex = value.indexOf(0);
@@ -255,7 +308,8 @@ class BleService extends ChangeNotifier {
             ? value.sublist(0, nullTerminatorIndex)
             : value;
         _currentSmartShunt = _currentSmartShunt.copyWith(
-            deviceNameSuffix: utf8.decode(actualValue));
+          deviceNameSuffix: utf8.decode(actualValue),
+        );
       } catch (e) {
         // Gracefully handle the error to prevent a crash
       }
@@ -266,7 +320,8 @@ class BleService extends ChangeNotifier {
             ? value.sublist(0, nullTerminatorIndex)
             : value;
         _currentSmartShunt = _currentSmartShunt.copyWith(
-            firmwareVersion: utf8.decode(actualValue));
+          firmwareVersion: utf8.decode(actualValue),
+        );
       } catch (e) {
         // Gracefully handle the error to prevent a crash
       }
@@ -288,8 +343,7 @@ class BleService extends ChangeNotifier {
       }
     } else if (characteristicUuid == PROGRESS_UUID) {
       if (value.isNotEmpty) {
-        _currentSmartShunt =
-            _currentSmartShunt.copyWith(otaProgress: value[0]);
+        _currentSmartShunt = _currentSmartShunt.copyWith(otaProgress: value[0]);
       }
     }
     _smartShuntController.add(_currentSmartShunt);
