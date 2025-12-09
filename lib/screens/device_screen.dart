@@ -94,6 +94,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                           'Battery Voltage',
                           '${smartShunt.batteryVoltage.toStringAsFixed(2)} V',
                           Icons.battery_charging_full,
+                          overrideColor: _getVoltageColor(
+                            smartShunt.batteryVoltage,
+                          ),
                         ),
                         _buildInfoTile(
                           context,
@@ -104,9 +107,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                               : smartShunt.batteryCurrent < 0
                               ? Icons.arrow_downward
                               : Icons.flash_on,
-                          valueColor: _getStatusColor(
-                            context,
+                          overrideColor: _getCurrentColor(
                             smartShunt.batteryCurrent,
+                            smartShunt.remainingCapacity,
                           ),
                         ),
                         _buildInfoTile(
@@ -118,9 +121,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
                             smartShunt.timeRemaining,
                             smartShunt.batteryCurrent,
                           ),
-                          valueColor: _getStatusColor(
-                            context,
-                            smartShunt.batteryCurrent,
+                          overrideColor: _getPowerColor(
+                            smartShunt.batteryPower,
+                            smartShunt.batteryVoltage,
+                            smartShunt.remainingCapacity,
                           ),
                         ),
                         _buildInfoTile(
@@ -128,18 +132,27 @@ class _DeviceScreenState extends State<DeviceScreen> {
                           'State of Charge (SOC)',
                           '${(smartShunt.soc).toStringAsFixed(1)} %',
                           Icons.battery_std,
+                          overrideColor: _getSocColor(smartShunt.soc),
                         ),
                         _buildInfoTile(
                           context,
                           'Remaining Capacity',
                           '${smartShunt.remainingCapacity.toStringAsFixed(2)} Ah',
                           Icons.battery_saver,
+                          // Uses SOC logic for color as requested ("do same for capacity")
+                          overrideColor: _getSocColor(smartShunt.soc),
                         ),
                         _buildInfoTile(
                           context,
                           'Starter Voltage',
-                          '${smartShunt.starterBatteryVoltage.toStringAsFixed(2)} V',
+                          (smartShunt.starterBatteryVoltage >= 9.99 &&
+                                  smartShunt.starterBatteryVoltage <= 10.01)
+                              ? 'N/A'
+                              : '${smartShunt.starterBatteryVoltage.toStringAsFixed(2)} V',
                           Icons.battery_alert,
+                          overrideColor: _getStarterVoltageColor(
+                            smartShunt.starterBatteryVoltage,
+                          ),
                         ),
                         if (!smartShunt.isCalibrated)
                           _buildInfoTile(
@@ -162,18 +175,33 @@ class _DeviceScreenState extends State<DeviceScreen> {
                           'Last Hour Usage',
                           '${smartShunt.lastHourWh.toStringAsFixed(2)} Wh',
                           Icons.history_toggle_off,
+                          overrideColor: _getUsageColor(
+                            smartShunt.lastHourWh,
+                            smartShunt.batteryVoltage,
+                            smartShunt.remainingCapacity,
+                          ),
                         ),
                         _buildInfoTile(
                           context,
                           'Last Day Usage',
                           '${smartShunt.lastDayWh.toStringAsFixed(2)} Wh',
                           Icons.today,
+                          overrideColor: _getUsageColor(
+                            smartShunt.lastDayWh,
+                            smartShunt.batteryVoltage,
+                            smartShunt.remainingCapacity,
+                          ),
                         ),
                         _buildInfoTile(
                           context,
                           'Last Week Usage',
                           '${smartShunt.lastWeekWh.toStringAsFixed(2)} Wh',
                           Icons.calendar_view_week,
+                          overrideColor: _getUsageColor(
+                            smartShunt.lastWeekWh,
+                            smartShunt.batteryVoltage,
+                            smartShunt.remainingCapacity,
+                          ),
                         ),
                       ],
                     ),
@@ -204,17 +232,84 @@ class _DeviceScreenState extends State<DeviceScreen> {
     }
   }
 
-  Color? _getStatusColor(BuildContext context, double current) {
-    if (current > 0.1) {
+  // --- Color Logic Implementations ---
+
+  Color _getVoltageColor(double voltage) {
+    // Basic 12V battery health logic since "Voltage should be easy"
+    // Assuming LiFePO4/Acid mix reasonable range
+    if (voltage > 12.8) return Colors.green;
+    if (voltage >= 12.4) return Colors.yellow;
+    if (voltage >= 11.5) return Colors.orange;
+    return Colors.red;
+  }
+
+  Color _getCurrentColor(double current, double remainingCapacity) {
+    if (remainingCapacity == 0) return Colors.grey;
+    final ratio =
+        current.abs() / remainingCapacity; // Draw percentage of capacity
+
+    if (current > 0) {
+      // Charging - usually good
       return Colors.green;
-    } else if (current < -0.1) {
-      return Colors.orange;
     }
-    return null;
+
+    // Discharging (Draw) logic
+    if (ratio < 0.05) return Colors.green;
+    if (ratio < 0.10) return Colors.yellow;
+    if (ratio < 0.20) return Colors.orange; // 10-20%
+    return Colors
+        .red; // > 50% mentioned, treating >20% as red start or high orange
+  }
+
+  Color _getPowerColor(double power, double voltage, double remainingCapacity) {
+    if (voltage == 0 || remainingCapacity == 0) return Colors.grey;
+
+    // Benchmark: Total Available Power (approx Wh energy) - 50%
+    // user said: "benchmark against battery voltage x remaining capacity"
+    final reference = voltage * remainingCapacity;
+
+    final ratio = power.abs() / reference;
+
+    if (power > 0) return Colors.green; // Charging
+
+    if (ratio < 0.05) return Colors.green;
+    if (ratio < 0.10) return Colors.yellow;
+    if (ratio < 0.20) return Colors.orange;
+    return Colors.red;
+  }
+
+  Color _getSocColor(double soc) {
+    if (soc >= 30) return Colors.green;
+    if (soc >= 20) return Colors.yellow;
+    if (soc >= 10) return Colors.orange;
+    return Colors.red;
+  }
+
+  Color _getStarterVoltageColor(double voltage) {
+    if (voltage >= 9.99 && voltage <= 10.01) return Colors.grey; // N/A case
+    if (voltage > 12.2) return Colors.green;
+    if (voltage > 11.8) return Colors.yellow; // 11.81 - 12.2
+    if (voltage > 11.6) return Colors.orange; // 11.61 - 11.80
+    return Colors.red; // 10.01 - 11.60
+  }
+
+  Color _getUsageColor(double wh, double voltage, double capacity) {
+    if (voltage == 0 || capacity == 0) return Colors.grey;
+    final totalEnergy = voltage * capacity;
+    final ratio = wh / totalEnergy;
+
+    if (ratio < 0.05) return Colors.green;
+    if (ratio <= 0.10) return Colors.yellow; // 6-10%
+    if (ratio <= 0.20) return Colors.orange; // 11-20%
+    return Colors.red; // more
   }
 
   String? _formatTimeLabel(int? seconds, double current) {
-    if (seconds == null || seconds == 0) return null;
+    if (seconds == null) return null; // Wait for calc
+
+    // If current is effectively zero, don't show time
+    if (current.abs() < 0.05) return null;
+
     final int h = seconds ~/ 3600;
     final int m = (seconds % 3600) ~/ 60;
     String timeStr;
@@ -224,6 +319,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       timeStr = '${h}h ${m}m';
     }
 
+    // Current is Positive when Charging, Negative when Discharging
     if (current > 0) {
       return '$timeStr to full';
     } else if (current < 0) {
@@ -239,10 +335,13 @@ class _DeviceScreenState extends State<DeviceScreen> {
     IconData icon, {
     String? subtitle,
     bool isWarning = false,
-    Color? valueColor,
+    Color? overrideColor,
   }) {
     final theme = Theme.of(context);
-    final displayColor = valueColor ?? theme.textTheme.titleLarge?.color;
+    // Use overrideColor if provided, otherwise default to primary or error
+    final color =
+        overrideColor ??
+        (isWarning ? theme.colorScheme.error : theme.colorScheme.primary);
 
     return Card(
       elevation: 2,
@@ -253,13 +352,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 24,
-              color: isWarning
-                  ? theme.colorScheme.error
-                  : (valueColor ?? theme.colorScheme.primary),
-            ),
+            Icon(icon, size: 24, color: color),
             const SizedBox(height: 4),
             Text(
               title,
@@ -275,7 +368,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
-                color: displayColor,
+                color: color, // Also coloring the value text for emphasis
               ),
             ),
             if (subtitle != null) ...[
