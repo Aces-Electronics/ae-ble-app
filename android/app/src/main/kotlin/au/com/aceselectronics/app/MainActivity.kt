@@ -1,9 +1,9 @@
-package com.example.ae_ble_app
+package au.com.aceselectronics.app
 
 import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.ae_ble_app/car"
+    private val CHANNEL = "au.com.aceselectronics.app/car"
 
     override fun configureFlutterEngine(flutterEngine: io.flutter.embedding.engine.FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

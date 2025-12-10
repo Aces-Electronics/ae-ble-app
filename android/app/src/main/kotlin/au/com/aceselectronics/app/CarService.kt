@@ -1,4 +1,4 @@
-package com.example.ae_ble_app
+package au.com.aceselectronics.app
 
 import androidx.car.app.CarAppService
 import androidx.car.app.Session

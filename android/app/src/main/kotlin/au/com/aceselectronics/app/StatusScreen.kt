@@ -1,4 +1,4 @@
-package com.example.ae_ble_app
+package au.com.aceselectronics.app
 
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
@@ -77,7 +77,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
         }
         itemListBuilder.addItem(
             GridItem.Builder()
-                .setTitle("Starter")
+                .setTitle("Start Battery")
                 .setText(starterText)
                 .setImage(createIcon(R.drawable.ic_battery_alert))
                 .build()
@@ -135,7 +135,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
         return GridTemplate.Builder()
             .setSingleList(itemListBuilder.build())
             .setHeaderAction(Action.APP_ICON)
-            .setTitle("Smart Shunt Status")
+            .setTitle("AE - Smart Shunt Status")
             .build()
     }
 

@@ -45,10 +45,24 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bleService = context.watch<BleService>();
+    final isDefault = bleService.defaultDeviceId == widget.device.remoteId.str;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.device.platformName),
         actions: [
+          IconButton(
+            icon: Icon(isDefault ? Icons.star : Icons.star_border),
+            tooltip: isDefault ? 'Unset Default' : 'Set as Default',
+            onPressed: () {
+              if (isDefault) {
+                bleService.removeDefaultDevice();
+              } else {
+                bleService.saveDefaultDevice(widget.device.remoteId.str);
+              }
+            },
+          ),
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'settings') {

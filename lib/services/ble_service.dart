@@ -8,9 +8,10 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class BleService extends ChangeNotifier {
-  static const platform = MethodChannel('com.example.ae_ble_app/car');
+  static const platform = MethodChannel('au.com.aceselectronics.app/car');
 
   final StreamController<SmartShunt> _smartShuntController =
       StreamController<SmartShunt>.broadcast();
@@ -41,6 +42,9 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _updateControlCharacteristic;
   BluetoothCharacteristic? _releaseMetadataCharacteristic;
   BluetoothCharacteristic? _progressCharacteristic;
+
+  String? _defaultDeviceId;
+  String? get defaultDeviceId => _defaultDeviceId;
 
   BluetoothDevice? getDevice() => _device;
 
@@ -441,6 +445,107 @@ class BleService extends ChangeNotifier {
     _currentSmartShunt = _currentSmartShunt.copyWith(otaStatus: OtaStatus.idle);
     _smartShuntController.add(_currentSmartShunt);
     notifyListeners();
+  }
+
+  Future<void> loadDefaultDevice() async {
+    final prefs = await SharedPreferences.getInstance();
+    _defaultDeviceId = prefs.getString('default_device_id');
+    notifyListeners();
+  }
+
+  Future<void> saveDefaultDevice(String id) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('default_device_id', id);
+    _defaultDeviceId = id;
+    notifyListeners();
+  }
+
+  Future<void> removeDefaultDevice() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('default_device_id');
+    _defaultDeviceId = null;
+    notifyListeners();
+  }
+
+  Future<BluetoothDevice?> tryAutoConnect() async {
+    await loadDefaultDevice();
+    print('AutoConnect: Loaded default device ID: $_defaultDeviceId');
+
+    if (_defaultDeviceId == null) {
+      print('AutoConnect: No default device set.');
+      return null;
+    }
+
+    // Check if already connected (e.g. from a previous session or system)
+    for (var device in FlutterBluePlus.connectedDevices) {
+      if (device.remoteId.str == _defaultDeviceId) {
+        print('AutoConnect: Device $_defaultDeviceId already connected.');
+        _device = device;
+        await discoverServices(device);
+        return device;
+      }
+    }
+
+    print('AutoConnect: Starting scan for $_defaultDeviceId...');
+
+    // Start scanning. We don't use withRemoteIds because it can be restrictive
+    // or buggy on some Android versions/chipsets if the device isn't cached.
+    // A general scan is safer for finding the device if it's advertising.
+    try {
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+    } catch (e) {
+      print('AutoConnect: Error starting scan: $e');
+      // If scan fails to start, we can't do much.
+      return null;
+    }
+
+    BluetoothDevice? foundDevice;
+    final completer = Completer<BluetoothDevice?>();
+
+    final subscription = FlutterBluePlus.scanResults.listen((results) {
+      for (ScanResult r in results) {
+        // Debug: print found devices to see if we are seeing anything
+        // print('AutoConnect: Saw ${r.device.remoteId} (${r.device.platformName})');
+        if (r.device.remoteId.str == _defaultDeviceId) {
+          print('AutoConnect: FOUND MATCH: ${r.device.remoteId}');
+          if (!completer.isCompleted) {
+            completer.complete(r.device);
+          }
+        }
+      }
+    });
+
+    try {
+      foundDevice = await completer.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          print('AutoConnect: Timed out waiting for device.');
+          return null;
+        },
+      );
+    } catch (e) {
+      print('AutoConnect: Exception during wait: $e');
+      foundDevice = null;
+    } finally {
+      print('AutoConnect: Stopping scan.');
+      subscription.cancel();
+      await FlutterBluePlus.stopScan();
+    }
+
+    if (foundDevice != null) {
+      print('AutoConnect: Connecting to ${foundDevice.remoteId}...');
+      try {
+        await connectToDevice(foundDevice);
+        print('AutoConnect: Success!');
+        return foundDevice;
+      } catch (e) {
+        print('AutoConnect: Connection failed: $e');
+      }
+    } else {
+      print('AutoConnect: Default device not found in scan results.');
+    }
+
+    return null;
   }
 
   Future<void> reconnectToLastDevice() async {

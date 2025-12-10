@@ -1,4 +1,4 @@
-package com.example.ae_ble_app
+package au.com.aceselectronics.app
 
 import android.content.Intent
 import androidx.car.app.Screen

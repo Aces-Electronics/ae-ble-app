@@ -56,7 +56,30 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     _bleService = Provider.of<BleService>(context, listen: false);
-    _requestPermissions().then((_) => _bleService.startScan());
+    _requestPermissions().then((_) => _initBle());
+  }
+
+  Future<void> _initBle() async {
+    // Try auto-connect first
+    setState(() {
+      _isConnecting = true;
+    });
+
+    final device = await _bleService.tryAutoConnect();
+
+    if (mounted) {
+      setState(() {
+        _isConnecting = false;
+      });
+      if (device != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => DeviceScreen(device: device)),
+        );
+      } else {
+        _bleService.startScan();
+      }
+    }
   }
 
   Future<void> _requestPermissions() async {
@@ -98,18 +121,34 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isConnecting) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('AE BLE Scanner')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              if (_connectingDevice != null)
+                Text('Connecting to ${_connectingDevice!.platformName}...')
+              else
+                const Text('Connecting to default device...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('AE BLE Scanner'),
-      ),
+      appBar: AppBar(title: const Text('AE BLE Scanner')),
       body: StreamBuilder<List<ScanResult>>(
         stream: FlutterBluePlus.scanResults,
         initialData: const [],
         builder: (context, snapshot) {
           final allDevices = snapshot.data!;
           final aeDevices = allDevices
-              .where((element) =>
-                  element.device.platformName.startsWith('AE '))
+              .where((element) => element.device.platformName.startsWith('AE '))
               .toList();
           final otherDevicesCount = allDevices.length - aeDevices.length;
 
@@ -127,10 +166,10 @@ class _MyHomePageState extends State<MyHomePage> {
                     if (manufacturerData.containsKey(espressifCompanyId)) {
                       final data = manufacturerData[espressifCompanyId]!;
                       if (data.length >= 4) {
-                        final byteData =
-                            ByteData.sublistView(Uint8List.fromList(data));
-                        final voltageMv =
-                            byteData.getUint16(0, Endian.little);
+                        final byteData = ByteData.sublistView(
+                          Uint8List.fromList(data),
+                        );
+                        final voltageMv = byteData.getUint16(0, Endian.little);
                         final voltage = voltageMv / 1000.0;
                         final isLoadOn = byteData.getUint8(3) == 1;
                         leadingIcon = _getBatteryIcon(voltage, isLoadOn);
@@ -142,12 +181,16 @@ class _MyHomePageState extends State<MyHomePage> {
 
                     return Card(
                       margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       child: ListTile(
                         leading: leadingIcon,
-                        title: Text(result.device.platformName.isNotEmpty
-                            ? result.device.platformName
-                            : 'Unknown Device'),
+                        title: Text(
+                          result.device.platformName.isNotEmpty
+                              ? result.device.platformName
+                              : 'Unknown Device',
+                        ),
                         subtitle: Text(result.device.remoteId.toString()),
                         trailing: isConnectingToThisDevice
                             ? const CircularProgressIndicator()
@@ -160,8 +203,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                   _connectingDevice = result.device;
                                 });
                                 try {
-                                  await _bleService
-                                      .connectToDevice(result.device);
+                                  await _bleService.connectToDevice(
+                                    result.device,
+                                  );
                                   if (mounted) {
                                     Navigator.push(
                                       context,
@@ -173,12 +217,14 @@ class _MyHomePageState extends State<MyHomePage> {
                                   }
                                 } catch (e) {
                                   if (mounted) {
-                                    ScaffoldMessenger.of(context)
-                                        .showSnackBar(SnackBar(
-                                      content: Text(
-                                          'Failed to connect: ${e.toString()}'),
-                                      backgroundColor: Colors.red,
-                                    ));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Failed to connect: ${e.toString()}',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
                                   }
                                 } finally {
                                   if (mounted) {
@@ -207,12 +253,11 @@ class _MyHomePageState extends State<MyHomePage> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed:
-            _isConnecting ? null : () async => await _bleService.startScan(),
+        onPressed: _isConnecting
+            ? null
+            : () async => await _bleService.startScan(),
         child: _isConnecting
-            ? const CircularProgressIndicator(
-                backgroundColor: Colors.white,
-              )
+            ? const CircularProgressIndicator(backgroundColor: Colors.white)
             : const Icon(Icons.search),
       ),
     );

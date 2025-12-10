@@ -1,4 +1,4 @@
-package com.example.ae_ble_app
+package au.com.aceselectronics.app
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
