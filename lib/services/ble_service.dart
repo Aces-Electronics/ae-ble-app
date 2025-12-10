@@ -7,7 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:flutter/services.dart';
+
 class BleService extends ChangeNotifier {
+  static const platform = MethodChannel('com.example.ae_ble_app/car');
+
   final StreamController<SmartShunt> _smartShuntController =
       StreamController<SmartShunt>.broadcast();
   Stream<SmartShunt> get smartShuntStream => _smartShuntController.stream;
@@ -351,6 +355,61 @@ class BleService extends ChangeNotifier {
     }
     _smartShuntController.add(_currentSmartShunt);
     notifyListeners();
+    _sendToCar();
+  }
+
+  Future<void> _sendToCar() async {
+    try {
+      int? timeSec = _currentSmartShunt.timeRemaining;
+      String timeLabel = "Calculating...";
+      if (timeSec != null) {
+        int h = timeSec ~/ 3600;
+        int m = (timeSec % 3600) ~/ 60;
+        timeLabel = "${h}h ${m}m";
+        if (_currentSmartShunt.batteryCurrent > 0) {
+          timeLabel += " to full";
+        } else if (_currentSmartShunt.batteryCurrent < 0) {
+          timeLabel += " to empty";
+        }
+      } else if (_currentSmartShunt.batteryCurrent.abs() < 0.1) {
+        timeLabel = "";
+      }
+
+      String errorStateStr = "Normal";
+      switch (_currentSmartShunt.errorState) {
+        case ErrorState.warning:
+          errorStateStr = "Warning";
+          break;
+        case ErrorState.critical:
+          errorStateStr = "Critical";
+          break;
+        case ErrorState.overflow:
+          errorStateStr = "Overflow";
+          break;
+        case ErrorState.notCalibrated:
+          errorStateStr = "Not Calibrated";
+          break;
+        default:
+          errorStateStr = "Normal";
+      }
+
+      await platform.invokeMethod('updateData', {
+        "voltage": _currentSmartShunt.batteryVoltage,
+        "current": _currentSmartShunt.batteryCurrent,
+        "power": _currentSmartShunt.batteryPower,
+        "soc": _currentSmartShunt.soc,
+        "time": timeLabel,
+        "remainingCapacity": _currentSmartShunt.remainingCapacity,
+        "starterVoltage": _currentSmartShunt.starterBatteryVoltage,
+        "isCalibrated": _currentSmartShunt.isCalibrated,
+        "errorState": errorStateStr,
+        "lastHourWh": _currentSmartShunt.lastHourWh,
+        "lastDayWh": _currentSmartShunt.lastDayWh,
+        "lastWeekWh": _currentSmartShunt.lastWeekWh,
+      });
+    } on PlatformException {
+      // Platform not supported or other error
+    }
   }
 
   Future<void> _readReleaseMetadata() async {
