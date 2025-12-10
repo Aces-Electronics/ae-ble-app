@@ -13,9 +13,13 @@
     <!-- Needed for Bluetooth scanning on all Android versions. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
+    <!-- Required for testing side-loaded apps on real Android Auto hardware -->
+    <uses-permission android:name="com.google.android.gms.permission.CAR_APP_TESTING"/>
+
     <application
-        android:label="ae_ble_app"
+        android:label="Ace's Electronics"
         android:name="${applicationName}"
+        android:allowBackup="true"
         android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
@@ -49,7 +53,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
-                <category android:name="androidx.car.app.category.IOT" />
+                <category android:name="androidx.car.app.category.CHARGING" />
             </intent-filter>
         </service>
         <meta-data
@@ -57,7 +61,7 @@
             android:resource="@xml/automotive_app_desc" />
         <meta-data
             android:name="androidx.car.app.minCarApiLevel"
-            android:value="6" />
+            android:value="1" />
     </application>
 
     <!-- Required to query activities that can process text, see:
