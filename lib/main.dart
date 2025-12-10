@@ -202,13 +202,14 @@ class _MyHomePageState extends State<MyHomePage> {
                                   _isConnecting = true;
                                   _connectingDevice = result.device;
                                 });
+                                final messenger = ScaffoldMessenger.of(context);
+                                final navigator = Navigator.of(context);
                                 try {
                                   await _bleService.connectToDevice(
                                     result.device,
                                   );
                                   if (mounted) {
-                                    Navigator.push(
-                                      context,
+                                    navigator.push(
                                       MaterialPageRoute(
                                         builder: (context) =>
                                             DeviceScreen(device: result.device),
@@ -217,7 +218,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                   }
                                 } catch (e) {
                                   if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       SnackBar(
                                         content: Text(
                                           'Failed to connect: ${e.toString()}',
