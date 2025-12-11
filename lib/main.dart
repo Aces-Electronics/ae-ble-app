@@ -8,12 +8,12 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (context) => BleService(),
-      child: const MyApp(),
-    ),
-  );
+  WidgetsFlutterBinding.ensureInitialized();
+  // Initialize BLE Service singleton and start auto-connect
+  final bleService = BleService();
+  bleService.tryAutoConnect();
+
+  runApp(ChangeNotifierProvider.value(value: bleService, child: const MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -56,7 +56,12 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     _bleService = Provider.of<BleService>(context, listen: false);
-    _requestPermissions().then((_) => _initBle());
+    _requestPermissions().then((_) {
+      // Refresh scan if not connected
+      if (_bleService.getDevice() == null) {
+        _initBle();
+      }
+    });
   }
 
   Future<void> _initBle() async {
