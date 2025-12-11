@@ -50,10 +50,12 @@
             android:value="2" />
         <service
             android:name=".CarService"
-            android:exported="true">
+            android:exported="true"
+            android:label="Ace's Electronics"
+            android:icon="@mipmap/launcher_icon">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
-                <category android:name="androidx.car.app.category.CHARGING" />
+                <category android:name="androidx.car.app.category.IOT" />
             </intent-filter>
         </service>
         <meta-data
