@@ -294,19 +294,16 @@ class BleService extends ChangeNotifier {
         // Gracefully handle the error to prevent a crash
       }
     } else if (characteristicUuid == LAST_HOUR_WH_UUID) {
-      // User reports shifts in data, mapping 5E to Hour and 5F to Day
-      // _currentSmartShunt = _currentSmartShunt.copyWith(
-      //   lastHourWh: byteData.getFloat32(0, Endian.little),
-      // );
-    } else if (characteristicUuid == LAST_DAY_WH_UUID) {
-      // 5E contains Hour Data
       _currentSmartShunt = _currentSmartShunt.copyWith(
         lastHourWh: byteData.getFloat32(0, Endian.little),
       );
-    } else if (characteristicUuid == LAST_WEEK_WH_UUID) {
-      // 5F contains Day Data
+    } else if (characteristicUuid == LAST_DAY_WH_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
         lastDayWh: byteData.getFloat32(0, Endian.little),
+      );
+    } else if (characteristicUuid == LAST_WEEK_WH_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+        lastWeekWh: byteData.getFloat32(0, Endian.little),
       );
     } else if (characteristicUuid == LOW_VOLTAGE_DISCONNECT_DELAY_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
