@@ -1,17 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:ae_ble_app/models/smart_shunt.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:http/http.dart' as http;
 
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BleService extends ChangeNotifier {
-  static const platform = MethodChannel('au.com.aceselectronics.app/car');
+  static const platform = MethodChannel('au.com.aceselectronics.sss/car');
 
   final StreamController<SmartShunt> _smartShuntController =
       StreamController<SmartShunt>.broadcast();
@@ -48,8 +48,40 @@ class BleService extends ChangeNotifier {
 
   BluetoothDevice? getDevice() => _device;
 
+  Timer? _autoConnectTimer;
+
   void dispose() {
+    _autoConnectTimer?.cancel();
     _smartShuntController.close();
+  }
+
+  void startAutoConnectLoop() {
+    // Prevent multiple timers
+    _autoConnectTimer?.cancel();
+    print('Starting AutoConnect Loop');
+    // Initial attempt immediately
+    tryAutoConnect();
+
+    _autoConnectTimer = Timer.periodic(const Duration(seconds: 15), (
+      timer,
+    ) async {
+      // If we are already connected to the default device, do nothing
+      if (_device != null &&
+          _defaultDeviceId != null &&
+          _device!.remoteId.str == _defaultDeviceId) {
+        var state = await _device!.connectionState.first;
+        if (state == BluetoothConnectionState.connected) {
+          return;
+        }
+      }
+
+      // If we are scanning or connecting, tryAutoConnect handles its own logic,
+      // but we should check if we should even try.
+      if (_defaultDeviceId != null) {
+        print('AutoConnectLoop: Not connected to default device. Retrying...');
+        await tryAutoConnect();
+      }
+    });
   }
 
   Future<void> startScan() async {
@@ -60,16 +92,25 @@ class BleService extends ChangeNotifier {
     print('Connecting to device: ${device.remoteId}');
     _device = device;
     try {
-      FlutterBluePlus.stopScan();
-      await device.connect();
+      await FlutterBluePlus.stopScan();
+      await device.connect(
+        autoConnect: true,
+      ); // Allow autoConnect on Android for robustness
       await discoverServices(device);
     } catch (e) {
+      // If connection fails, _device might still be set, but state will be disconnected.
+      // We'll let the loop handle retry or the UI handle error.
       rethrow;
     }
   }
 
   Future<void> discoverServices(BluetoothDevice device) async {
     print('Discovering services for device: ${device.remoteId}');
+    // Note: On Android, discoverServices sometimes needs a slight delay after connect
+    if (Platform.isAndroid) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
     List<BluetoothService> services = await device.discoverServices();
     print('Found ${services.length} services');
     for (BluetoothService service in services) {

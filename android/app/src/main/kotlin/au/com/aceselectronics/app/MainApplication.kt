@@ -1,4 +1,4 @@
-package au.com.aceselectronics.app
+package au.com.aceselectronics.sss
 
 import android.app.Application
 import io.flutter.embedding.engine.FlutterEngine
@@ -8,7 +8,7 @@ import io.flutter.embedding.engine.dart.DartExecutor
 class MainApplication : Application() {
     companion object {
         const val ENGINE_ID = "ae_engine_1"
-        const val CHANNEL = "au.com.aceselectronics.app/car"
+        const val CHANNEL = "au.com.aceselectronics.sss/car"
     }
 
     override fun onCreate() {

@@ -11,7 +11,7 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize BLE Service singleton and start auto-connect
   final bleService = BleService();
-  bleService.tryAutoConnect();
+  bleService.startAutoConnectLoop();
 
   runApp(ChangeNotifierProvider.value(value: bleService, child: const MyApp()));
 }

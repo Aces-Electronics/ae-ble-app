@@ -1,4 +1,4 @@
-package au.com.aceselectronics.app
+package au.com.aceselectronics.sss
 
 import io.flutter.embedding.android.FlutterActivity
 
