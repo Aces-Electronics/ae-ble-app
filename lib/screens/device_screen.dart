@@ -117,9 +117,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                           'Battery Current',
                           '${smartShunt.batteryCurrent.toStringAsFixed(2)} A',
                           smartShunt.batteryCurrent > 0
-                              ? Icons.arrow_upward
-                              : smartShunt.batteryCurrent < 0
                               ? Icons.arrow_downward
+                              : smartShunt.batteryCurrent < 0
+                              ? Icons.arrow_upward
                               : Icons.flash_on,
                           overrideColor: _getCurrentColor(
                             smartShunt.batteryCurrent,
