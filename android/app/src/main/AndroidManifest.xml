@@ -58,15 +58,6 @@
                 <category android:name="androidx.car.app.category.IOT" />
             </intent-filter>
         </service>
-        <service
-            android:name=".BatteryMediaService"
-            android:exported="true"
-            android:label="Battery Monitor"
-            android:icon="@mipmap/launcher_icon">
-            <intent-filter>
-                <action android:name="android.media.browse.MediaBrowserService" />
-            </intent-filter>
-        </service>
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
