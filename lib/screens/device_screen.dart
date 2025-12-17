@@ -309,8 +309,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   Color _getUsageColor(double wh, double voltage, double capacity) {
     if (voltage == 0 || capacity == 0) return Colors.grey;
+
+    // Positive values indicate surplus energy (charging), which is good -> Green
+    if (wh >= 0) return Colors.green;
+
+    // Negative values indicate usage (discharging)
+    // We want to warn based on how much was used relative to capacity
     final totalEnergy = voltage * capacity;
-    final ratio = wh / totalEnergy;
+    final ratio = wh.abs() / totalEnergy;
 
     if (ratio < 0.05) return Colors.green;
     if (ratio <= 0.10) return Colors.yellow; // 6-10%
