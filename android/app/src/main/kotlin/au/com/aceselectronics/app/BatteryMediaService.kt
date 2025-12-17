@@ -25,7 +25,7 @@ class BatteryMediaService : MediaBrowserServiceCompat() {
         // Set an initial PlaybackState
         val playbackState = PlaybackStateCompat.Builder()
             .setActions(
-                PlaybackStateCompat.ACTION_PLAY | PlaybackStateCompat.ACTION_PAUSE
+                PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_PAUSE
             )
             .setState(PlaybackStateCompat.STATE_PAUSED, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
             .build()
@@ -87,7 +87,7 @@ class BatteryMediaService : MediaBrowserServiceCompat() {
         // Ensure state is updated so it shows as 'active' content
         val playbackState = PlaybackStateCompat.Builder()
             .setActions(
-                PlaybackStateCompat.ACTION_PLAY | PlaybackStateCompat.ACTION_PAUSE
+                PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_PAUSE
             )
             .setState(PlaybackStateCompat.STATE_PLAYING, 0L, 0f) // Playing at 0 speed to show as active
             .build()
