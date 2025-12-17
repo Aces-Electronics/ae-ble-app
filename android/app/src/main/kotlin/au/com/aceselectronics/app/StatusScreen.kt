@@ -45,14 +45,15 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
         )
 
         // 3. Power
+        val powerTitle = String.format("Power: %.2f W", data.power)
         val powerText = if (data.timeRemaining.isNotEmpty()) {
-            String.format("%.2f W\n%s", data.power, data.timeRemaining)
+            data.timeRemaining
         } else {
-            String.format("%.2f W", data.power)
+            " "
         }
         itemListBuilder.addItem(
             GridItem.Builder()
-                .setTitle("Power")
+                .setTitle(powerTitle)
                 .setText(powerText)
                 .setImage(createIcon(R.drawable.ic_power_plug, getPowerColor(data.power, data.voltage, data.remainingCapacity)))
                 .build()
@@ -206,8 +207,12 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
 
     private fun getUsageColor(wh: Double, voltage: Double, capacity: Double): Int {
         if (voltage == 0.0 || capacity == 0.0) return COLOR_GREY
+        
+        // Positive is surplus -> Green
+        if (wh >= 0) return COLOR_GREEN
+
         val totalEnergy = voltage * capacity
-        val ratio = wh / totalEnergy
+        val ratio = Math.abs(wh) / totalEnergy
 
         if (ratio < 0.05) return COLOR_GREEN
         if (ratio <= 0.10) return COLOR_YELLOW
