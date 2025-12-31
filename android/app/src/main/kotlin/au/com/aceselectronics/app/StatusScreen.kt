@@ -22,9 +22,14 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
     private val COLOR_GREY = 0xFF9E9E9E.toInt()
     // private val COLOR_BLUE = 0xFF0175C2.toInt() // Brand Blue from previous edit
 
+    // NO_OP click listener to prevent driving restriction warnings
+    private val noOpClickListener: () -> Unit = {}
+
     override fun onGetTemplate(): Template {
         val data = DataHolder.batteryData.value ?: BatteryData()
         val itemListBuilder = ItemList.Builder()
+            // Disable selection while driving to prevent restriction warnings
+            .setNoItemsMessage("No data available")
 
         // 1. Voltage
         itemListBuilder.addItem(
@@ -32,6 +37,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("Voltage")
                 .setText(String.format("%.2f V", data.voltage))
                 .setImage(createIcon(R.drawable.ic_voltage, getVoltageColor(data.voltage)))
+                .setOnClickListener(noOpClickListener)
                 .build()
         )
 
@@ -41,6 +47,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("Current")
                 .setText(String.format("%.2f A", data.current))
                 .setImage(createIcon(R.drawable.ic_current, getCurrentColor(data.current, data.remainingCapacity)))
+                .setOnClickListener(noOpClickListener)
                 .build()
         )
 
@@ -56,6 +63,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle(powerTitle)
                 .setText(powerText)
                 .setImage(createIcon(R.drawable.ic_power_plug, getPowerColor(data.power, data.voltage, data.remainingCapacity)))
+                .setOnClickListener(noOpClickListener)
                 .build()
         )
 
@@ -65,6 +73,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("SOC")
                 .setText(String.format("%.1f %%", data.soc))
                 .setImage(createIcon(R.drawable.ic_battery, getSocColor(data.soc)))
+                .setOnClickListener(noOpClickListener)
                 .build()
         )
 
@@ -74,6 +83,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("Capacity")
                 .setText(String.format("%.2f Ah", data.remainingCapacity))
                 .setImage(createIcon(R.drawable.ic_capacity, getSocColor(data.soc))) // Matches Dart logic
+                .setOnClickListener(noOpClickListener)
                 .build()
         )
 
@@ -89,6 +99,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("Start Battery")
                 .setText(starterText)
                 .setImage(createIcon(R.drawable.ic_battery_alert, starterColor))
+                .setOnClickListener(noOpClickListener)
                 .build()
         )
 
@@ -99,6 +110,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                     .setTitle("Calibration")
                     .setText("Not Calibrated")
                     .setImage(createIcon(R.drawable.ic_settings, COLOR_RED)) // Warning/Error color
+                    .setOnClickListener(noOpClickListener)
                     .build()
             )
         }
@@ -110,6 +122,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                     .setTitle("Error")
                     .setText(data.errorState)
                     .setImage(createIcon(R.drawable.ic_warning, COLOR_RED))
+                    .setOnClickListener(noOpClickListener)
                     .build()
             )
         }
@@ -120,6 +133,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("Last Hour")
                 .setText(String.format("%.2f Wh", data.lastHourWh))
                 .setImage(createIcon(R.drawable.ic_calendar, getUsageColor(data.lastHourWh, data.voltage, data.remainingCapacity)))
+                .setOnClickListener(noOpClickListener)
                 .build()
         )
 
@@ -129,6 +143,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("Last Day")
                 .setText(String.format("%.2f Wh", data.lastDayWh))
                 .setImage(createIcon(R.drawable.ic_calendar, getUsageColor(data.lastDayWh, data.voltage, data.remainingCapacity)))
+                .setOnClickListener(noOpClickListener)
                 .build()
         )
 
@@ -138,6 +153,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("Last Week")
                 .setText(String.format("%.2f Wh", data.lastWeekWh))
                 .setImage(createIcon(R.drawable.ic_calendar, getUsageColor(data.lastWeekWh, data.voltage, data.remainingCapacity)))
+                .setOnClickListener(noOpClickListener)
                 .build()
         )
 

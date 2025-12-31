@@ -42,6 +42,7 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _updateControlCharacteristic;
   BluetoothCharacteristic? _releaseMetadataCharacteristic;
   BluetoothCharacteristic? _progressCharacteristic;
+  BluetoothCharacteristic? _setRatedCapacityCharacteristic;
 
   String? _defaultDeviceId;
   String? get defaultDeviceId => _defaultDeviceId;
@@ -84,7 +85,26 @@ class BleService extends ChangeNotifier {
     });
   }
 
+  Future<void> _waitForBluetoothOn() async {
+    if (Platform.isIOS) {
+      // Check current state via stream
+      var state = await FlutterBluePlus.adapterState.first;
+      if (state != BluetoothAdapterState.on) {
+        print('Waiting for Bluetooth to turn on...');
+        try {
+          await FlutterBluePlus.adapterState
+              .where((s) => s == BluetoothAdapterState.on)
+              .first
+              .timeout(const Duration(seconds: 5));
+        } catch (e) {
+          print('Timeout or error waiting for Bluetooth: $e');
+        }
+      }
+    }
+  }
+
   Future<void> startScan() async {
+    await _waitForBluetoothOn();
     await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
   }
 
@@ -93,9 +113,8 @@ class BleService extends ChangeNotifier {
     _device = device;
     try {
       await FlutterBluePlus.stopScan();
-      await device.connect(
-        autoConnect: true,
-      ); // Allow autoConnect on Android for robustness
+      // AutoConnect can be problematic on iOS with MTU negotiation or specific devices
+      await device.connect(autoConnect: false);
       await discoverServices(device);
     } catch (e) {
       // If connection fails, _device might still be set, but state will be disconnected.
@@ -158,6 +177,8 @@ class BleService extends ChangeNotifier {
             _releaseMetadataCharacteristic = characteristic;
           } else if (characteristic.uuid == PROGRESS_UUID) {
             _progressCharacteristic = characteristic;
+          } else if (characteristic.uuid == SET_RATED_CAPACITY_CHAR_UUID) {
+            _setRatedCapacityCharacteristic = characteristic;
           }
         }
       }
@@ -217,6 +238,15 @@ class BleService extends ChangeNotifier {
   Future<void> setDeviceNameSuffix(String suffix) async {
     if (_setDeviceNameSuffixCharacteristic != null) {
       await _setDeviceNameSuffixCharacteristic!.write(utf8.encode(suffix));
+    }
+  }
+
+  Future<void> setRatedCapacity(double capacity) async {
+    if (_setRatedCapacityCharacteristic != null) {
+      final byteData = ByteData(4)..setFloat32(0, capacity, Endian.little);
+      await _setRatedCapacityCharacteristic!.write(
+        byteData.buffer.asUint8List(),
+      );
     }
   }
 
@@ -390,10 +420,13 @@ class BleService extends ChangeNotifier {
           }
         }
       }
-    } else if (characteristicUuid == PROGRESS_UUID) {
       if (value.isNotEmpty) {
         _currentSmartShunt = _currentSmartShunt.copyWith(otaProgress: value[0]);
       }
+    } else if (characteristicUuid == SET_RATED_CAPACITY_CHAR_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+        ratedCapacity: byteData.getFloat32(0, Endian.little),
+      );
     }
     _smartShuntController.add(_currentSmartShunt);
     notifyListeners();
@@ -449,8 +482,9 @@ class BleService extends ChangeNotifier {
         "lastDayWh": _currentSmartShunt.lastDayWh,
         "lastWeekWh": _currentSmartShunt.lastWeekWh,
       });
-    } on PlatformException {
-      // Platform not supported or other error
+    } catch (e) {
+      // Platform not supported (MissingPluginException) or other error
+      // This is expected when CarPlay is disabled or on Android without the plugin
     }
   }
 
@@ -525,6 +559,8 @@ class BleService extends ChangeNotifier {
     }
 
     print('AutoConnect: Starting scan for $_defaultDeviceId...');
+
+    await _waitForBluetoothOn();
 
     // Start scanning. We don't use withRemoteIds because it can be restrictive
     // or buggy on some Android versions/chipsets if the device isn't cached.

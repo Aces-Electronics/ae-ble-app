@@ -11,82 +11,98 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final bleService = Provider.of<BleService>(context);
     return StreamBuilder<SmartShunt>(
-        stream: bleService.smartShuntStream,
-        builder: (context, snapshot) {
-          final smartShunt = snapshot.data;
-          if (smartShunt == null) {
-            return Scaffold(
-              appBar: AppBar(
-                title: const Text('Settings'),
-              ),
-              body: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
-
+      stream: bleService.smartShuntStream,
+      builder: (context, snapshot) {
+        final smartShunt = snapshot.data;
+        if (smartShunt == null) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Settings'),
-            ),
-            body: ListView(
-              children: [
-                SwitchListTile(
-                  title: const Text('Load Output'),
-                  value: smartShunt.loadState,
-                  onChanged: (bool value) {
-                    bleService.setLoadState(value);
-                  },
-                ),
-                ListTile(
-                  title: const Text('Set State of Charge (SOC)'),
-                  subtitle:
-                      Text('${(smartShunt.soc).toStringAsFixed(1)} %'),
-                  onTap: () => _showSetSocDialog(context, smartShunt, bleService),
-                ),
-                ListTile(
-                  title: const Text('Set Voltage Protection'),
-                  subtitle: Text(
-                      'Cutoff: ${smartShunt.cutoffVoltage.toStringAsFixed(2)} V, Reconnect: ${smartShunt.reconnectVoltage.toStringAsFixed(2)} V'),
-                  onTap: () => _showSetVoltageProtectionDialog(
-                      context, smartShunt, bleService),
-                ),
-                ListTile(
-                  title: const Text('Low-Voltage Disconnect Delay'),
-                  subtitle: Text(
-                      '${smartShunt.lowVoltageDisconnectDelay.toString()} seconds'),
-                  onTap: () => _showSetDelayDialog(context, smartShunt),
-                ),
-                ListTile(
-                  title: const Text('Set Device Name Suffix'),
-                  subtitle: Text(smartShunt.deviceNameSuffix.isNotEmpty
-                      ? smartShunt.deviceNameSuffix
-                      : 'Not Set'),
-                  onTap: () => _showSetDeviceNameSuffixDialog(
-                      context, smartShunt, bleService),
-                ),
-                const Divider(),
-                ListTile(
-                  title: const Text('Firmware Update'),
-                  leading: const Icon(Icons.system_update),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const OtaUpdateScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
+            appBar: AppBar(title: const Text('Settings')),
+            body: const Center(child: CircularProgressIndicator()),
           );
-        });
+        }
+
+        return Scaffold(
+          appBar: AppBar(title: const Text('Settings')),
+          body: ListView(
+            children: [
+              SwitchListTile(
+                title: const Text('Enable Load Output'),
+                value: smartShunt.loadState,
+                onChanged: (bool value) {
+                  bleService.setLoadState(value);
+                },
+              ),
+              ListTile(
+                title: const Text('Set State of Charge (SOC)'),
+                subtitle: Text('${(smartShunt.soc).toStringAsFixed(1)} %'),
+                onTap: () => _showSetSocDialog(context, smartShunt, bleService),
+              ),
+              ListTile(
+                title: const Text('Set Rated Battery Capacity'),
+                subtitle: Text(
+                  '${smartShunt.ratedCapacity.toStringAsFixed(1)} Ah',
+                ),
+                onTap: () =>
+                    _showRatedCapacityDialog(context, smartShunt, bleService),
+              ),
+              ListTile(
+                title: const Text('Set Voltage Protection'),
+                subtitle: Text(
+                  'Cutoff: ${smartShunt.cutoffVoltage.toStringAsFixed(2)} V, Reconnect: ${smartShunt.reconnectVoltage.toStringAsFixed(2)} V',
+                ),
+                onTap: () => _showSetVoltageProtectionDialog(
+                  context,
+                  smartShunt,
+                  bleService,
+                ),
+              ),
+              ListTile(
+                title: const Text('Set Low-Voltage Disconnect Delay'),
+                subtitle: Text(
+                  '${smartShunt.lowVoltageDisconnectDelay.toString()} seconds',
+                ),
+                onTap: () => _showSetDelayDialog(context, smartShunt),
+              ),
+              ListTile(
+                title: const Text('Set Device Name Suffix'),
+                subtitle: Text(
+                  smartShunt.deviceNameSuffix.isNotEmpty
+                      ? smartShunt.deviceNameSuffix
+                      : 'Not Set',
+                ),
+                onTap: () => _showSetDeviceNameSuffixDialog(
+                  context,
+                  smartShunt,
+                  bleService,
+                ),
+              ),
+              const Divider(),
+              ListTile(
+                title: const Text('Firmware Update'),
+                leading: const Icon(Icons.system_update),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const OtaUpdateScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _showSetSocDialog(
-      BuildContext context, SmartShunt smartShunt, BleService bleService) {
-    final socController =
-        TextEditingController(text: smartShunt.soc.toStringAsFixed(1));
+    BuildContext context,
+    SmartShunt smartShunt,
+    BleService bleService,
+  ) {
+    final socController = TextEditingController(
+      text: smartShunt.soc.toStringAsFixed(1),
+    );
     showDialog(
       context: context,
       builder: (context) {
@@ -122,11 +138,16 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showSetVoltageProtectionDialog(
-      BuildContext context, SmartShunt smartShunt, BleService bleService) {
+    BuildContext context,
+    SmartShunt smartShunt,
+    BleService bleService,
+  ) {
     final cutoffController = TextEditingController(
-        text: smartShunt.cutoffVoltage.toStringAsFixed(2));
+      text: smartShunt.cutoffVoltage.toStringAsFixed(2),
+    );
     final reconnectController = TextEditingController(
-        text: smartShunt.reconnectVoltage.toStringAsFixed(2));
+      text: smartShunt.reconnectVoltage.toStringAsFixed(2),
+    );
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -141,8 +162,9 @@ class SettingsScreen extends StatelessWidget {
               children: [
                 TextFormField(
                   controller: cutoffController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Cutoff Voltage (V)',
                     border: OutlineInputBorder(),
@@ -157,8 +179,9 @@ class SettingsScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: reconnectController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Reconnect Voltage (V)',
                     border: OutlineInputBorder(),
@@ -223,9 +246,13 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showSetDeviceNameSuffixDialog(
-      BuildContext context, SmartShunt smartShunt, BleService bleService) {
-    final suffixController =
-        TextEditingController(text: smartShunt.deviceNameSuffix);
+    BuildContext context,
+    SmartShunt smartShunt,
+    BleService bleService,
+  ) {
+    final suffixController = TextEditingController(
+      text: smartShunt.deviceNameSuffix,
+    );
     showDialog(
       context: context,
       builder: (context) {
@@ -248,6 +275,51 @@ class SettingsScreen extends StatelessWidget {
               onPressed: () {
                 bleService.setDeviceNameSuffix(suffixController.text);
                 Navigator.pop(context);
+              },
+              child: const Text('Set'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showRatedCapacityDialog(
+    BuildContext context,
+    SmartShunt smartShunt,
+    BleService bleService,
+  ) {
+    final capacityController = TextEditingController(
+      text: smartShunt.ratedCapacity.toStringAsFixed(1),
+    );
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Set Rated Capacity'),
+          content: TextField(
+            controller: capacityController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Capacity (Ah)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final capacity = double.tryParse(capacityController.text);
+                if (capacity != null && capacity > 0) {
+                  bleService.setRatedCapacity(capacity);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Rated Capacity Updated')),
+                  );
+                }
               },
               child: const Text('Set'),
             ),
@@ -309,21 +381,22 @@ class _LowVoltageDelayDropdownState extends State<LowVoltageDelayDropdown> {
   Widget build(BuildContext context) {
     // Find the display text for the current delay value
     final String? currentOption = delayOptions.entries
-        .firstWhere((entry) => entry.value == _currentDelay,
-            orElse: () => const MapEntry('Custom', -1))
+        .firstWhere(
+          (entry) => entry.value == _currentDelay,
+          orElse: () => const MapEntry('Custom', -1),
+        )
         .key;
 
     return DropdownButton<String>(
       value: currentOption != 'Custom' ? currentOption : null,
-      hint: Text(_currentDelay != null && currentOption == 'Custom'
-          ? '$_currentDelay Seconds'
-          : 'Select Delay'),
+      hint: Text(
+        _currentDelay != null && currentOption == 'Custom'
+            ? '$_currentDelay Seconds'
+            : 'Select Delay',
+      ),
       onChanged: _onChanged,
       items: delayOptions.keys.map<DropdownMenuItem<String>>((String value) {
-        return DropdownMenuItem<String>(
-          value: value,
-          child: Text(value),
-        );
+        return DropdownMenuItem<String>(value: value, child: Text(value));
       }).toList(),
     );
   }
