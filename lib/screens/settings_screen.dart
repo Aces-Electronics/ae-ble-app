@@ -1,5 +1,6 @@
 import 'package:ae_ble_app/models/smart_shunt.dart';
 import 'package:ae_ble_app/screens/ota_update_screen.dart';
+import 'package:ae_ble_app/screens/qr_scan_screen.dart';
 import 'package:ae_ble_app/services/ble_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +11,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bleService = Provider.of<BleService>(context);
+
     return StreamBuilder<SmartShunt>(
       stream: bleService.smartShuntStream,
       builder: (context, snapshot) {
@@ -25,58 +27,68 @@ class SettingsScreen extends StatelessWidget {
           appBar: AppBar(title: const Text('Settings')),
           body: ListView(
             children: [
-              SwitchListTile(
-                title: const Text('Enable Load Output'),
-                value: smartShunt.loadState,
-                onChanged: (bool value) {
-                  bleService.setLoadState(value);
+              // 1. ESP-NOW MAC (Visible at top)
+              FutureBuilder<String?>(
+                future: bleService.readEspNowMac(),
+                builder: (context, snapshot) {
+                  return ListTile(
+                    title: const Text('ESP-NOW MAC'),
+                    subtitle: Text(snapshot.data ?? "Loading..."),
+                    leading: const Icon(Icons.wifi),
+                  );
                 },
               ),
-              ListTile(
-                title: const Text('Set State of Charge (SOC)'),
-                subtitle: Text('${(smartShunt.soc).toStringAsFixed(1)} %'),
-                onTap: () => _showSetSocDialog(context, smartShunt, bleService),
-              ),
-              ListTile(
-                title: const Text('Set Rated Battery Capacity'),
-                subtitle: Text(
-                  '${smartShunt.ratedCapacity.toStringAsFixed(1)} Ah',
-                ),
-                onTap: () =>
-                    _showRatedCapacityDialog(context, smartShunt, bleService),
-              ),
-              ListTile(
-                title: const Text('Set Voltage Protection'),
-                subtitle: Text(
-                  'Cutoff: ${smartShunt.cutoffVoltage.toStringAsFixed(2)} V, Reconnect: ${smartShunt.reconnectVoltage.toStringAsFixed(2)} V',
-                ),
-                onTap: () => _showSetVoltageProtectionDialog(
-                  context,
-                  smartShunt,
-                  bleService,
-                ),
-              ),
-              ListTile(
-                title: const Text('Set Low-Voltage Disconnect Delay'),
-                subtitle: Text(
-                  '${smartShunt.lowVoltageDisconnectDelay.toString()} seconds',
-                ),
-                onTap: () => _showSetDelayDialog(context, smartShunt),
-              ),
-              ListTile(
-                title: const Text('Set Device Name Suffix'),
-                subtitle: Text(
-                  smartShunt.deviceNameSuffix.isNotEmpty
-                      ? smartShunt.deviceNameSuffix
-                      : 'Not Set',
-                ),
-                onTap: () => _showSetDeviceNameSuffixDialog(
-                  context,
-                  smartShunt,
-                  bleService,
-                ),
-              ),
               const Divider(),
+
+              // 2. Pair with Gauge (Moved up)
+              ListTile(
+                title: const Text('Pair with Gauge'),
+                leading: const Icon(Icons.qr_code_scanner),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const QRCodeScannerScreen(),
+                    ),
+                  );
+                },
+              ),
+
+              const Divider(),
+
+              // 3. Shunt Configuration Sub-Menu
+              ListTile(
+                title: const Text('Change Shunt Settings'),
+                subtitle: const Text('Capacity, SOC, Voltage Protection, etc.'),
+                leading: const Icon(Icons.tune),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          ShuntSettingsScreen(smartShunt: smartShunt),
+                    ),
+                  );
+                },
+              ),
+
+              // 4. Advanced Settings Sub-Menu
+              ListTile(
+                title: const Text('Advanced Settings'),
+                subtitle: const Text('Reset Pairing, Factory Reset'),
+                leading: const Icon(Icons.settings_applications),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AdvancedSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+
+              const Divider(),
+
+              // 5. Firmware Update
               ListTile(
                 title: const Text('Firmware Update'),
                 leading: const Icon(Icons.system_update),
@@ -92,6 +104,91 @@ class SettingsScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class ShuntSettingsScreen extends StatelessWidget {
+  final SmartShunt smartShunt;
+
+  const ShuntSettingsScreen({super.key, required this.smartShunt});
+
+  @override
+  Widget build(BuildContext context) {
+    final bleService = Provider.of<BleService>(context);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Shunt Settings')),
+      body: ListView(
+        children: [
+          SwitchListTile(
+            title: const Text('Enable Load Output'),
+            value: smartShunt.loadState,
+            onChanged: (bool value) {
+              bleService.setLoadState(value);
+            },
+          ),
+          ListTile(
+            title: const Text('Set State of Charge (SOC)'),
+            subtitle: Text('${(smartShunt.soc).toStringAsFixed(1)} %'),
+            onTap: () => _showSetSocDialog(context, smartShunt, bleService),
+          ),
+          ListTile(
+            title: const Text('Set Rated Battery Capacity'),
+            subtitle: Text('${smartShunt.ratedCapacity.toStringAsFixed(1)} Ah'),
+            onTap: () =>
+                _showRatedCapacityDialog(context, smartShunt, bleService),
+          ),
+          FutureBuilder<double?>(
+            future: bleService.readEfuseLimit(),
+            builder: (context, snapshot) {
+              final limit = snapshot.data;
+              final maxLimit = smartShunt.activeShuntRating * 0.5;
+              final subtitle = limit != null && limit > 0
+                  ? '${limit.toStringAsFixed(1)} A (Max: ${maxLimit.toStringAsFixed(0)} A)'
+                  : 'Disabled (Max: ${maxLimit.toStringAsFixed(0)} A)';
+              return ListTile(
+                title: const Text('Set E-Fuse Limit'),
+                subtitle: Text(subtitle),
+                onTap: () => _showSetEfuseDialog(
+                  context,
+                  bleService,
+                  limit ?? 0.0,
+                  smartShunt.activeShuntRating,
+                ),
+              );
+            },
+          ),
+          ListTile(
+            title: const Text('Set Voltage Protection'),
+            subtitle: Text(
+              'Cutoff: ${smartShunt.cutoffVoltage.toStringAsFixed(2)} V, Reconnect: ${smartShunt.reconnectVoltage.toStringAsFixed(2)} V',
+            ),
+            onTap: () => _showSetVoltageProtectionDialog(
+              context,
+              smartShunt,
+              bleService,
+            ),
+          ),
+          ListTile(
+            title: const Text('Set Low-Voltage Disconnect Delay'),
+            subtitle: Text(
+              '${smartShunt.lowVoltageDisconnectDelay.toString()} seconds',
+            ),
+            onTap: () => _showSetDelayDialog(context, smartShunt),
+          ),
+          ListTile(
+            title: const Text('Set Device Name Suffix'),
+            subtitle: Text(
+              smartShunt.deviceNameSuffix.isNotEmpty
+                  ? smartShunt.deviceNameSuffix
+                  : 'Not Set',
+            ),
+            onTap: () =>
+                _showSetDeviceNameSuffixDialog(context, smartShunt, bleService),
+          ),
+        ],
+      ),
     );
   }
 
@@ -225,6 +322,70 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  void _showSetEfuseDialog(
+    BuildContext context,
+    BleService bleService,
+    double currentLimit,
+    int activeShuntRating,
+  ) {
+    final maxLimit = activeShuntRating * 0.5;
+    final controller = TextEditingController(
+      text: currentLimit.toStringAsFixed(1),
+    );
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Set E-Fuse Current Limit'),
+          content: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Limit (Amps)',
+              helperText:
+                  'Set to 0 to disable. Max: ${maxLimit.toStringAsFixed(0)} A',
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final limit = double.tryParse(controller.text);
+                if (limit != null && limit >= 0) {
+                  if (limit > maxLimit) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'E-Fuse limit cannot exceed ${maxLimit.toStringAsFixed(0)} A (50% of shunt rating)',
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                  bleService.setEfuseLimit(limit);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'E-Fuse Limit Set to ${limit.toStringAsFixed(1)} A',
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Set'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showSetDelayDialog(BuildContext context, SmartShunt smartShunt) {
     showDialog(
       context: context,
@@ -326,6 +487,115 @@ class SettingsScreen extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class AdvancedSettingsScreen extends StatelessWidget {
+  const AdvancedSettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final bleService = Provider.of<BleService>(context, listen: false);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Advanced Settings')),
+      body: ListView(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.link_off, color: Colors.orange),
+            title: const Text('Reset Pairing'),
+            subtitle: const Text('Clear Gauge Pairing (Discovery Mode)'),
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Reset Pairing?"),
+                  content: const Text(
+                    "This will clear the stored Gauge MAC address. The Shunt will revert to Discovery Mode (Yellow Beacon).",
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text("Cancel"),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text(
+                        "Reset",
+                        style: TextStyle(color: Colors.orange),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                try {
+                  await bleService.unpairShunt();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Reset command sent.")),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Failed to reset: $e")),
+                  );
+                }
+              }
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.delete_forever, color: Colors.red),
+            title: const Text('Factory Reset Device'),
+            subtitle: const Text('Wipe ALL Data and Reboot'),
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Factory Reset Device?"),
+                  content: const Text(
+                    "WARNING: This will wipe ALL settings (Calibration, Capacity, WiFi, Pairing, etc.) and reboot the device.\n\nThis action cannot be undone.",
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text("Cancel"),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text(
+                        "FACTORY RESET",
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                try {
+                  await bleService.factoryResetShunt();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        "Factory Reset command sent. Device will reboot.",
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Failed to reset: $e")),
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,7 +1,14 @@
 // lib/models/smart_shunt.dart
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
-enum ErrorState { normal, warning, critical, overflow, notCalibrated }
+enum ErrorState {
+  normal,
+  warning,
+  critical,
+  overflow,
+  notCalibrated,
+  eFuseTripped,
+}
 
 enum OtaStatus {
   idle,
@@ -52,6 +59,8 @@ class SmartShunt {
   final String? otaErrorMessage;
   final int? timeRemaining; // in seconds
   final double ratedCapacity;
+  final double eFuseLimit;
+  final int activeShuntRating;
 
   SmartShunt({
     this.batteryVoltage = 0.0,
@@ -77,6 +86,8 @@ class SmartShunt {
     this.otaErrorMessage,
     this.timeRemaining,
     this.ratedCapacity = 0.0,
+    this.eFuseLimit = 0.0,
+    this.activeShuntRating = 0,
   });
 
   // Add a copyWith method to easily update the state
@@ -104,6 +115,8 @@ class SmartShunt {
     String? otaErrorMessage,
     int? timeRemaining,
     double? ratedCapacity,
+    double? eFuseLimit,
+    int? activeShuntRating,
   }) {
     return SmartShunt(
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
@@ -131,6 +144,8 @@ class SmartShunt {
       otaErrorMessage: otaErrorMessage ?? this.otaErrorMessage,
       timeRemaining: timeRemaining ?? this.timeRemaining,
       ratedCapacity: ratedCapacity ?? this.ratedCapacity,
+      eFuseLimit: eFuseLimit ?? this.eFuseLimit,
+      activeShuntRating: activeShuntRating ?? this.activeShuntRating,
     );
   }
 
@@ -189,14 +204,19 @@ final Guid DEVICE_NAME_SUFFIX_UUID = Guid(
 final Guid WIFI_SSID_CHAR_UUID = Guid("5A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C62");
 final Guid WIFI_PASS_CHAR_UUID = Guid("6A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C63");
 
-// OTA Firmware Update Characteristic UUIDs
 final Guid CURRENT_VERSION_UUID = Guid('8A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C65');
-final Guid UPDATE_STATUS_UUID = Guid('2a89b148-b4e8-43d7-952b-a0b4b01e43b3');
-final Guid UPDATE_CONTROL_UUID = Guid('3a89b148-b4e8-43d7-952b-a0b4b01e43b3');
-final Guid RELEASE_METADATA_UUID = Guid('4a89b148-b4e8-43d7-952b-a0b4b01e43b3');
-final Guid PROGRESS_UUID = Guid('5a89b148-b4e8-43d7-952b-a0b4b01e43b3');
+final Guid UPDATE_URL_UUID = Guid(
+  '9A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C66',
+); // Release Metadata URL
+final Guid UPDATE_STATUS_UUID = Guid('AA1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C67');
+final Guid OTA_TRIGGER_UUID = Guid('7A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C64');
 
-// Rated Capacity Characteristic UUID
 final Guid SET_RATED_CAPACITY_CHAR_UUID = Guid(
   "5A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C64",
 );
+
+final Guid PAIRING_CHAR_UUID = Guid("ACDC1234-5678-90AB-CDEF-1234567890CB");
+
+final Guid EFUSE_LIMIT_UUID = Guid("BB1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C68");
+
+final Guid ACTIVE_SHUNT_UUID = Guid("CB1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C69");

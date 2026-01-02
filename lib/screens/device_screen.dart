@@ -40,6 +40,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   @override
   void dispose() {
     _connectionStateSubscription.cancel();
+    // Ensure we disconnect when leaving the screen to prevent ghost connections
+    _bleService.disconnect();
     super.dispose();
   }
 
@@ -84,6 +86,44 @@ class _DeviceScreenState extends State<DeviceScreen> {
               return SingleChildScrollView(
                 child: Column(
                   children: [
+                    if (smartShunt.errorState == ErrorState.eFuseTripped)
+                      Container(
+                        width: double.infinity,
+                        color: Colors.red,
+                        padding: const EdgeInsets.all(16.0),
+                        margin: const EdgeInsets.all(8.0),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.warning,
+                              color: Colors.white,
+                              size: 48,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              "E-FUSE TRIPPED!",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                              ),
+                            ),
+                            const Text(
+                              "LOAD DISCONNECTED",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              "Check for short circuits. Go to Settings > Change Shunt Settings to re-enable load.",
+                              style: TextStyle(color: Colors.white),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
                     GridView.count(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -233,6 +273,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
         return 'Overflow';
       case ErrorState.notCalibrated:
         return 'Not Calibrated';
+      case ErrorState.eFuseTripped:
+        return 'E-Fuse Tripped';
     }
   }
 
@@ -320,13 +362,25 @@ class _DeviceScreenState extends State<DeviceScreen> {
     // If current is effectively zero, don't show time
     if (current.abs() < 0.05) return null;
 
-    final int h = seconds ~/ 3600;
-    final int m = (seconds % 3600) ~/ 60;
+    final int totalHours = seconds ~/ 3600;
+    final int days = totalHours ~/ 24;
+    final int hours = totalHours % 24;
+    final int minutes = (seconds % 3600) ~/ 60;
+
     String timeStr;
-    if (h == 0 && m == 0) {
-      timeStr = "< 1m";
+    if (days >= 7) {
+      // Cap at > 7 days
+      timeStr = "> 7 days";
+    } else if (days > 0) {
+      // Show days and hours (e.g., "2d 7h")
+      timeStr = '${days}d ${hours}h';
+    } else if (totalHours > 0) {
+      // Show hours and minutes
+      timeStr = '${totalHours}h ${minutes}m';
+    } else if (minutes > 0) {
+      timeStr = '${minutes}m';
     } else {
-      timeStr = '${h}h ${m}m';
+      timeStr = "< 1m";
     }
 
     // Current is Positive when Charging, Negative when Discharging

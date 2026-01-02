@@ -39,15 +39,16 @@ class BleService extends ChangeNotifier {
   // OTA
   BluetoothCharacteristic? _currentVersionCharacteristic;
   BluetoothCharacteristic? _updateStatusCharacteristic;
-  BluetoothCharacteristic? _updateControlCharacteristic;
-  BluetoothCharacteristic? _releaseMetadataCharacteristic;
-  BluetoothCharacteristic? _progressCharacteristic;
+  BluetoothCharacteristic? _otaTriggerCharacteristic;
   BluetoothCharacteristic? _setRatedCapacityCharacteristic;
+  BluetoothCharacteristic? _pairingCharacteristic;
+  BluetoothCharacteristic? _efuseLimitCharacteristic;
 
   String? _defaultDeviceId;
   String? get defaultDeviceId => _defaultDeviceId;
 
   BluetoothDevice? getDevice() => _device;
+  String? get connectedDeviceId => _device?.remoteId.str;
 
   Timer? _autoConnectTimer;
 
@@ -108,13 +109,67 @@ class BleService extends ChangeNotifier {
     await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
   }
 
+  Future<void> disconnect() async {
+    print('Disconnecting from device: ${_device?.remoteId}');
+    if (_device != null) {
+      try {
+        await _device!.disconnect();
+      } catch (e) {
+        print("Error disconnecting: $e");
+      }
+      _device = null;
+
+      // Clear all characteristic references to avoid stale writes
+      _loadControlCharacteristic = null;
+      _setSocCharacteristic = null;
+      _setVoltageProtectionCharacteristic = null;
+      _setLowVoltageDisconnectDelayCharacteristic = null;
+      _setDeviceNameSuffixCharacteristic = null;
+      _wifiSsidCharacteristic = null;
+      _wifiPassCharacteristic = null;
+      _currentVersionCharacteristic = null;
+      _updateStatusCharacteristic = null;
+      _otaTriggerCharacteristic = null;
+      // _releaseMetadataCharacteristic = null;
+      // _progressCharacteristic = null;
+      _setRatedCapacityCharacteristic = null;
+      _pairingCharacteristic = null;
+      _efuseLimitCharacteristic = null;
+    }
+  }
+
   Future<void> connectToDevice(BluetoothDevice device) async {
     print('Connecting to device: ${device.remoteId}');
+    if (_device != null) {
+      // Disconnect previous if exists
+      await disconnect();
+    }
     _device = device;
     try {
       await FlutterBluePlus.stopScan();
       // AutoConnect can be problematic on iOS with MTU negotiation or specific devices
       await device.connect(autoConnect: false);
+
+      // OPTIMIZATION: Request high priority and MTU immediately
+      if (Platform.isAndroid) {
+        try {
+          // Clear GATT Cache to prevent stale services (Fix for Firmware Update UUID mismatch)
+          try {
+            await device.clearGattCache();
+            print("GATT Cache Cleared.");
+          } catch (e) {
+            print("Failed to clear GATT cache (Normal on some devices): $e");
+          }
+
+          await device.requestConnectionPriority(
+            connectionPriorityRequest: ConnectionPriority.high,
+          );
+          await device.requestMtu(512);
+        } catch (e) {
+          print("Optimization Request Failed: $e");
+        }
+      }
+
       await discoverServices(device);
     } catch (e) {
       // If connection fails, _device might still be set, but state will be disconnected.
@@ -142,16 +197,52 @@ class BleService extends ChangeNotifier {
           print('Characteristic: ${characteristic.uuid}');
 
           // Subscribe to notifications if the characteristic has the notify property
-          if (characteristic.properties.notify) {
-            await characteristic.setNotifyValue(true);
-            characteristic.lastValueStream.listen((value) async {
-              await _updateSmartShuntData(characteristic.uuid, value);
-            });
+          if (characteristic.properties.notify ||
+              characteristic.properties.indicate) {
+            try {
+              // Add timeout to prevent hanging on problematic characteristics
+              await characteristic
+                  .setNotifyValue(true)
+                  .timeout(const Duration(seconds: 2));
+              characteristic.lastValueStream.listen((value) async {
+                await _updateSmartShuntData(characteristic.uuid, value);
+              });
+            } catch (e) {
+              print('Error subscribing to ${characteristic.uuid}: $e');
+            }
           }
 
-          // Read initial value if the characteristic has the read property
-          if (characteristic.properties.read) {
-            await characteristic.read();
+          // Read initial value only for specific safe characteristics
+          if (characteristic.uuid == BATTERY_VOLTAGE_UUID ||
+              characteristic.uuid == BATTERY_CURRENT_UUID ||
+              characteristic.uuid == BATTERY_POWER_UUID ||
+              characteristic.uuid == SOC_UUID ||
+              characteristic.uuid == REMAINING_CAPACITY_UUID ||
+              characteristic.uuid == STARTER_BATTERY_VOLTAGE_UUID ||
+              characteristic.uuid == LOAD_STATE_UUID ||
+              characteristic.uuid == CALIBRATION_STATUS_UUID ||
+              characteristic.uuid == ERROR_STATE_UUID ||
+              characteristic.uuid == LAST_HOUR_WH_UUID ||
+              characteristic.uuid == LAST_DAY_WH_UUID ||
+              characteristic.uuid == LAST_WEEK_WH_UUID ||
+              characteristic.uuid == LOW_VOLTAGE_DISCONNECT_DELAY_UUID ||
+              characteristic.uuid == SET_RATED_CAPACITY_CHAR_UUID ||
+              characteristic.uuid == EFUSE_LIMIT_UUID ||
+              characteristic.uuid == ACTIVE_SHUNT_UUID ||
+              characteristic.uuid == CURRENT_VERSION_UUID ||
+              characteristic.uuid == DEVICE_NAME_SUFFIX_UUID ||
+              characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID) {
+            try {
+              if (characteristic.uuid == ERROR_STATE_UUID) {
+                final val = await characteristic.read();
+                await _updateSmartShuntData(ERROR_STATE_UUID, val);
+              } else {
+                final val = await characteristic.read();
+                await _updateSmartShuntData(characteristic.uuid, val);
+              }
+            } catch (e) {
+              print("Error reading ${characteristic.uuid}: $e");
+            }
           }
           if (characteristic.uuid == LOAD_CONTROL_UUID) {
             _loadControlCharacteristic = characteristic;
@@ -171,34 +262,70 @@ class BleService extends ChangeNotifier {
             _currentVersionCharacteristic = characteristic;
           } else if (characteristic.uuid == UPDATE_STATUS_UUID) {
             _updateStatusCharacteristic = characteristic;
-          } else if (characteristic.uuid == UPDATE_CONTROL_UUID) {
-            _updateControlCharacteristic = characteristic;
-          } else if (characteristic.uuid == RELEASE_METADATA_UUID) {
-            _releaseMetadataCharacteristic = characteristic;
-          } else if (characteristic.uuid == PROGRESS_UUID) {
-            _progressCharacteristic = characteristic;
+          } else if (characteristic.uuid == OTA_TRIGGER_UUID) {
+            _otaTriggerCharacteristic = characteristic;
           } else if (characteristic.uuid == SET_RATED_CAPACITY_CHAR_UUID) {
             _setRatedCapacityCharacteristic = characteristic;
+          } else if (characteristic.uuid == PAIRING_CHAR_UUID ||
+              characteristic.uuid.toString().toUpperCase() ==
+                  "ACDC1234-5678-90AB-CDEF-1234567890CA") {
+            _pairingCharacteristic = characteristic;
+            print(
+              "Found Pairing Characteristic (UUID: ${characteristic.uuid})",
+            );
+            print(
+              "Properties: Read=${characteristic.properties.read}, Write=${characteristic.properties.write}, Notify=${characteristic.properties.notify}, WriteEnc=${characteristic.properties.write}, ReadEnc=${characteristic.properties.read}",
+            );
+          } else if (characteristic.uuid == EFUSE_LIMIT_UUID) {
+            _efuseLimitCharacteristic = characteristic;
           }
         }
       }
     }
   }
 
-  Future<void> checkForUpdate() async {
-    if (_updateControlCharacteristic != null) {
-      print('OTA LOG: Writing 1 to Update Control characteristic.');
-      await _updateControlCharacteristic!.write([1]);
+  // Helper for safe writes with error handling for Pairing/Bonding failures
+  Future<void> _safeWrite(
+    BluetoothCharacteristic? c,
+    List<int> value,
+    String name,
+  ) async {
+    if (c == null) {
+      print("Error: $name characteristic is null.");
+      return;
+    }
+    try {
+      await c.write(value);
+      print("$name write success.");
+    } catch (e) {
+      print("Error writing to $name: $e");
     }
   }
 
+  Future<void> checkForUpdate() async {
+    // Logic for checking update URL? Firmware handles it?
+    // Firmware has UPDATE_URL_CHAR_UUID but it is READ only.
+    // So maybe we trigger check by writing to OTA_TRIGGER?
+    // Old logic wrote [1]. Let's assume Trigger accepts boolean or command.
+    // Firmware: BoolCharacteristicCallbacks. onWrite: value[0] != 0 -> callback(true).
+    // So writing [1] seems correct to Trigger OTA.
+    // But user said "Check for Update" vs "Start Update".
+    // ble_handler.cpp only has otaTriggerCallback.
+    // And it calls otaHandler.triggerUpdate().
+    // So currently there is only ONE action: Trigger OTA.
+    // We should probably just call it.
+    print(
+      "Check for update not explicitly supported by firmware, assuming manual trigger available.",
+    );
+  }
+
   Future<void> setWifiCredentials(String ssid, String password) async {
-    if (_wifiSsidCharacteristic != null) {
-      await _wifiSsidCharacteristic!.write(utf8.encode(ssid));
-    }
-    if (_wifiPassCharacteristic != null) {
-      await _wifiPassCharacteristic!.write(utf8.encode(password));
-    }
+    await _safeWrite(_wifiSsidCharacteristic, utf8.encode(ssid), "WiFi SSID");
+    await _safeWrite(
+      _wifiPassCharacteristic,
+      utf8.encode(password),
+      "WiFi Password",
+    );
   }
 
   Future<void> setLoadState(bool enabled) async {
@@ -206,55 +333,179 @@ class BleService extends ChangeNotifier {
     _currentSmartShunt = _currentSmartShunt.copyWith(loadState: enabled);
     _smartShuntController.add(_currentSmartShunt);
 
-    if (_loadControlCharacteristic != null) {
-      await _loadControlCharacteristic!.write([enabled ? 1 : 0]);
-    }
+    await _safeWrite(_loadControlCharacteristic, [
+      enabled ? 1 : 0,
+    ], "Load Control");
   }
 
   Future<void> setSoc(double soc) async {
-    if (_setSocCharacteristic != null) {
-      final byteData = ByteData(4)..setFloat32(0, soc, Endian.little);
-      await _setSocCharacteristic!.write(byteData.buffer.asUint8List());
-    }
+    final byteData = ByteData(4)..setFloat32(0, soc, Endian.little);
+    await _safeWrite(
+      _setSocCharacteristic,
+      byteData.buffer.asUint8List(),
+      "Set SOC",
+    );
   }
 
   Future<void> setVoltageProtection(double cutoff, double reconnect) async {
-    if (_setVoltageProtectionCharacteristic != null) {
-      final value = '$cutoff,$reconnect';
-      await _setVoltageProtectionCharacteristic!.write(value.codeUnits);
-    }
+    final value = '$cutoff,$reconnect';
+    await _safeWrite(
+      _setVoltageProtectionCharacteristic,
+      value.codeUnits,
+      "Voltage Protection",
+    );
   }
 
   Future<void> setLowVoltageDisconnectDelay(int seconds) async {
-    if (_setLowVoltageDisconnectDelayCharacteristic != null) {
-      final buffer = ByteData(4);
-      buffer.setUint32(0, seconds, Endian.little);
-      await _setLowVoltageDisconnectDelayCharacteristic!.write(
-        buffer.buffer.asUint8List(),
-      );
-    }
+    final buffer = ByteData(4)..setUint32(0, seconds, Endian.little);
+    await _safeWrite(
+      _setLowVoltageDisconnectDelayCharacteristic,
+      buffer.buffer.asUint8List(),
+      "LVD Delay",
+    );
   }
 
   Future<void> setDeviceNameSuffix(String suffix) async {
-    if (_setDeviceNameSuffixCharacteristic != null) {
-      await _setDeviceNameSuffixCharacteristic!.write(utf8.encode(suffix));
-    }
+    await _safeWrite(
+      _setDeviceNameSuffixCharacteristic,
+      utf8.encode(suffix),
+      "Device Name Suffix",
+    );
   }
 
   Future<void> setRatedCapacity(double capacity) async {
-    if (_setRatedCapacityCharacteristic != null) {
-      final byteData = ByteData(4)..setFloat32(0, capacity, Endian.little);
-      await _setRatedCapacityCharacteristic!.write(
-        byteData.buffer.asUint8List(),
+    final byteData = ByteData(4)..setFloat32(0, capacity, Endian.little);
+    await _safeWrite(
+      _setRatedCapacityCharacteristic,
+      byteData.buffer.asUint8List(),
+      "Rated Capacity",
+    );
+  }
+
+  Future<void> setEfuseLimit(double amps) async {
+    final byteData = ByteData(2)..setUint16(0, amps.round(), Endian.little);
+    await _safeWrite(
+      _efuseLimitCharacteristic,
+      byteData.buffer.asUint8List(),
+      "E-Fuse Limit",
+    );
+  }
+
+  Future<double?> readEfuseLimit() async {
+    if (_efuseLimitCharacteristic != null) {
+      try {
+        List<int> value = await _efuseLimitCharacteristic!.read();
+        if (value.isNotEmpty) {
+          final byteData = ByteData.sublistView(Uint8List.fromList(value));
+          return byteData.getUint16(0, Endian.little).toDouble();
+        }
+      } catch (e) {
+        print("Error reading E-Fuse Limit: $e");
+      }
+    }
+    return null;
+  }
+
+  Future<void> unpairShunt() async {
+    print("Sending UNPAIR/RESET command to Shunt...");
+
+    // Wait for characteristic if null
+    int retries = 0;
+    while (_pairingCharacteristic == null && retries < 20) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      retries++;
+    }
+
+    try {
+      await _safeWrite(
+        _pairingCharacteristic,
+        utf8.encode("RESET"),
+        "Unpair/Reset",
       );
+    } catch (e) {
+      if (e.toString().contains("WRITE property is not supported")) {
+        print("Unpair failed: Write Not Supported");
+        throw Exception("Firmware does not support Unpair/Reset via BLE.");
+      }
+      rethrow;
     }
   }
 
-  Future<void> startOtaUpdate() async {
-    if (_updateControlCharacteristic != null) {
-      print('OTA LOG: Writing 2 to Update Control characteristic.');
-      await _updateControlCharacteristic!.write([2]);
+  Future<void> factoryResetShunt() async {
+    print("Sending FACTORY_RESET command to Shunt...");
+
+    // Wait for characteristic if null
+    int retries = 0;
+    while (_pairingCharacteristic == null && retries < 20) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      retries++;
     }
+
+    try {
+      await _safeWrite(
+        _pairingCharacteristic,
+        utf8.encode("FACTORY_RESET"),
+        "Factory Reset",
+      );
+    } catch (e) {
+      if (e.toString().contains("WRITE property is not supported")) {
+        print("Factory Reset failed: Write Not Supported");
+        throw Exception("Firmware does not support Factory Reset via BLE.");
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> pairGauge(String gaugeMac, String key) async {
+    final payload = jsonEncode({"gauge_mac": gaugeMac, "key": key});
+    print("Pairing: Writing payload to characteristic: $payload");
+    await _safeWrite(
+      _pairingCharacteristic,
+      utf8.encode(payload),
+      "Pair Gauge",
+    );
+  }
+
+  Future<String?> readEspNowMac() async {
+    // Wait for characteristic if not yet found (handling race condition on connect)
+    int retries = 0;
+    while (_pairingCharacteristic == null && retries < 50) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      retries++;
+    }
+
+    if (_pairingCharacteristic != null) {
+      try {
+        List<int> value = await _pairingCharacteristic!.read();
+        if (value.isEmpty) return "Unknown";
+        print("Raw ESP-NOW MAC Bytes: $value");
+
+        try {
+          String str = utf8.decode(value);
+          // If it has null terminators or weird chars, trim/clean?
+          return str.replaceAll(RegExp(r'[^0-9A-Fa-f:]'), '');
+        } catch (e) {
+          print("UTF-8 Decode failed, trying Hex format: $e");
+          // Fallback to Hex formatting (Assuming raw bytes 6 chars)
+          return value
+              .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+              .join(':');
+        }
+      } catch (e) {
+        if (e.toString().contains("READ property is not supported")) {
+          return "Read Not Supported";
+        }
+        print("Error reading ESP-NOW MAC: $e");
+        return "Error Reading";
+      }
+    }
+    return "Unavailable";
+  }
+
+  Future<void> startOtaUpdate() async {
+    await _safeWrite(_otaTriggerCharacteristic, [
+      1,
+    ], "Start OTA Update"); // 1 = true
   }
 
   Future<void> _updateSmartShuntData(
@@ -411,13 +662,13 @@ class BleService extends ChangeNotifier {
         final status = OtaStatus.values[statusValue];
         _currentSmartShunt = _currentSmartShunt.copyWith(otaStatus: status);
         if (status == OtaStatus.updateAvailable && !_isFetchingMetadata) {
-          _isFetchingMetadata = true;
-          try {
-            print('OTA LOG: Update available. Reading Release Metadata...');
-            await _readReleaseMetadata();
-          } finally {
-            _isFetchingMetadata = false;
-          }
+          // _isFetchingMetadata = true;
+          // try {
+          //   print('OTA LOG: Update available. Reading Release Metadata...');
+          //   await _readReleaseMetadata();
+          // } finally {
+          //   _isFetchingMetadata = false;
+          // }
         }
       }
       if (value.isNotEmpty) {
@@ -426,6 +677,14 @@ class BleService extends ChangeNotifier {
     } else if (characteristicUuid == SET_RATED_CAPACITY_CHAR_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
         ratedCapacity: byteData.getFloat32(0, Endian.little),
+      );
+    } else if (characteristicUuid == EFUSE_LIMIT_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+        eFuseLimit: byteData.getUint16(0, Endian.little).toDouble(),
+      );
+    } else if (characteristicUuid == ACTIVE_SHUNT_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+        activeShuntRating: byteData.getUint16(0, Endian.little),
       );
     }
     _smartShuntController.add(_currentSmartShunt);
@@ -438,13 +697,35 @@ class BleService extends ChangeNotifier {
       int? timeSec = _currentSmartShunt.timeRemaining;
       String timeLabel = "Calculating...";
       if (timeSec != null) {
-        int h = timeSec ~/ 3600;
-        int m = (timeSec % 3600) ~/ 60;
-        timeLabel = "${h}h ${m}m";
-        if (_currentSmartShunt.batteryCurrent > 0) {
-          timeLabel += " to full";
-        } else if (_currentSmartShunt.batteryCurrent < 0) {
-          timeLabel += " to empty";
+        if (timeSec > 7 * 24 * 3600) {
+          timeLabel = "> 7 days";
+        } else {
+          int d = timeSec ~/ (24 * 3600);
+          int reminder = timeSec % (24 * 3600);
+          int h = reminder ~/ 3600;
+          int m = (reminder % 3600) ~/ 60;
+
+          if (d > 0) {
+            timeLabel = "${d}d ${h}h";
+          } else {
+            timeLabel = "${h}h ${m}m";
+          }
+        }
+
+        if (timeLabel != "> 7 days") {
+          if (_currentSmartShunt.batteryCurrent > 0) {
+            timeLabel += " to full";
+          } else if (_currentSmartShunt.batteryCurrent < 0) {
+            timeLabel += " to empty";
+          }
+        } else {
+          // Append context even for > 7 days? Or just leave as > 7 days?
+          // " > 7 days to full" sounds fine.
+          if (_currentSmartShunt.batteryCurrent > 0) {
+            timeLabel += " to full";
+          } else if (_currentSmartShunt.batteryCurrent < 0) {
+            timeLabel += " to empty";
+          }
         }
       } else if (_currentSmartShunt.batteryCurrent.abs() < 0.1) {
         timeLabel = "";
@@ -485,31 +766,6 @@ class BleService extends ChangeNotifier {
     } catch (e) {
       // Platform not supported (MissingPluginException) or other error
       // This is expected when CarPlay is disabled or on Android without the plugin
-    }
-  }
-
-  Future<void> _readReleaseMetadata() async {
-    if (_releaseMetadataCharacteristic == null) return;
-    try {
-      final value = await _releaseMetadataCharacteristic!.read();
-      if (value.isEmpty) {
-        _currentSmartShunt = _currentSmartShunt.copyWith(
-          otaStatus: OtaStatus.updateFailed,
-          otaErrorMessage:
-              'Failed to retrieve update details from the device. Please try again.',
-        );
-        _smartShuntController.add(_currentSmartShunt);
-        notifyListeners();
-        return;
-      }
-
-      final rawMetadata = utf8.decode(value);
-      print('OTA LOG: Received Release Metadata: $rawMetadata');
-      final metadataJson = jsonDecode(rawMetadata);
-      final metadata = ReleaseMetadata.fromJson(metadataJson);
-      _releaseMetadataController.add(metadata);
-    } catch (e) {
-      print('OTA LOG: Error reading or parsing Release Metadata: $e');
     }
   }
 

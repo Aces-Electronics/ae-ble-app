@@ -28,8 +28,6 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
         val data = DataHolder.batteryData.value ?: BatteryData()
         val itemListBuilder = ItemList.Builder()
-            // Disable selection while driving to prevent restriction warnings
-            .setNoItemsMessage("No data available")
 
         // 1. Voltage
         itemListBuilder.addItem(
@@ -103,6 +101,11 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                 .build()
         )
 
+        // LIMIT OF 6 ITEMS WHILE DRIVING
+        // We only show the top 6: Voltage, Current, Power, SOC, Capacity, Starter Voltage.
+        // The following are commented out to prevent "App is disabled while driving".
+
+        /*
         // 7. Calibration Status (Conditional)
         if (!data.isCalibrated) {
             itemListBuilder.addItem(
@@ -156,6 +159,7 @@ class StatusScreen(carContext: CarContext) : Screen(carContext) {
                 .setOnClickListener(noOpClickListener)
                 .build()
         )
+        */
 
         return GridTemplate.Builder()
             .setSingleList(itemListBuilder.build())
