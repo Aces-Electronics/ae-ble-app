@@ -135,6 +135,27 @@ class BleService extends ChangeNotifier {
       _setRatedCapacityCharacteristic = null;
       _pairingCharacteristic = null;
       _efuseLimitCharacteristic = null;
+
+      // Reset state to empty/loading to prevent stale data on next connect
+      _currentSmartShunt = SmartShunt();
+      _currentHistory.clear();
+      _isFetchingMetadata = false; // Reset metadata fetching flag
+      _smartShuntController.add(_currentSmartShunt);
+    }
+  }
+
+  Future<void> reconnect() async {
+    if (_device != null) {
+      print('Reconnecting to device: ${_device!.remoteId}');
+      try {
+        await _device!
+            .connect(autoConnect: false)
+            .timeout(const Duration(seconds: 5));
+        await discoverServices(_device!);
+      } catch (e) {
+        print("Reconnection failed: $e");
+        rethrow;
+      }
     }
   }
 
@@ -336,6 +357,7 @@ class BleService extends ChangeNotifier {
     await _safeWrite(_loadControlCharacteristic, [
       enabled ? 1 : 0,
     ], "Load Control");
+    await _updateSmartShuntData(LOAD_STATE_UUID, [enabled ? 1 : 0]);
   }
 
   Future<void> setSoc(double soc) async {
@@ -345,6 +367,8 @@ class BleService extends ChangeNotifier {
       byteData.buffer.asUint8List(),
       "Set SOC",
     );
+    // Trigger update for SOC display (SOC_UUID handles 0.0-1.0 or 0-100)
+    await _updateSmartShuntData(SOC_UUID, byteData.buffer.asUint8List());
   }
 
   Future<void> setVoltageProtection(double cutoff, double reconnect) async {
@@ -354,6 +378,9 @@ class BleService extends ChangeNotifier {
       value.codeUnits,
       "Voltage Protection",
     );
+    // Add a null terminator as the receive logic expects it
+    final listWithNull = List<int>.from(value.codeUnits)..add(0);
+    await _updateSmartShuntData(SET_VOLTAGE_PROTECTION_UUID, listWithNull);
   }
 
   Future<void> setLowVoltageDisconnectDelay(int seconds) async {
@@ -363,6 +390,10 @@ class BleService extends ChangeNotifier {
       buffer.buffer.asUint8List(),
       "LVD Delay",
     );
+    await _updateSmartShuntData(
+      LOW_VOLTAGE_DISCONNECT_DELAY_UUID,
+      buffer.buffer.asUint8List(),
+    );
   }
 
   Future<void> setDeviceNameSuffix(String suffix) async {
@@ -371,6 +402,8 @@ class BleService extends ChangeNotifier {
       utf8.encode(suffix),
       "Device Name Suffix",
     );
+    final suffixWithNull = utf8.encode(suffix).toList()..add(0);
+    await _updateSmartShuntData(DEVICE_NAME_SUFFIX_UUID, suffixWithNull);
   }
 
   Future<void> setRatedCapacity(double capacity) async {
@@ -380,14 +413,22 @@ class BleService extends ChangeNotifier {
       byteData.buffer.asUint8List(),
       "Rated Capacity",
     );
+    await _updateSmartShuntData(
+      SET_RATED_CAPACITY_CHAR_UUID,
+      byteData.buffer.asUint8List(),
+    );
   }
 
   Future<void> setEfuseLimit(double amps) async {
-    final byteData = ByteData(2)..setUint16(0, amps.round(), Endian.little);
+    final byteData = ByteData(4)..setFloat32(0, amps, Endian.little);
     await _safeWrite(
       _efuseLimitCharacteristic,
       byteData.buffer.asUint8List(),
       "E-Fuse Limit",
+    );
+    await _updateSmartShuntData(
+      EFUSE_LIMIT_UUID,
+      byteData.buffer.asUint8List(),
     );
   }
 
@@ -397,10 +438,30 @@ class BleService extends ChangeNotifier {
         List<int> value = await _efuseLimitCharacteristic!.read();
         if (value.isNotEmpty) {
           final byteData = ByteData.sublistView(Uint8List.fromList(value));
-          return byteData.getUint16(0, Endian.little).toDouble();
+          // Update the stream so the UI sees it
+          await _updateSmartShuntData(EFUSE_LIMIT_UUID, value);
+          return byteData.getFloat32(0, Endian.little);
         }
       } catch (e) {
         print("Error reading E-Fuse Limit: $e");
+      }
+    }
+    return null;
+  }
+
+  Future<int?> readLowVoltageDelay() async {
+    if (_setLowVoltageDisconnectDelayCharacteristic != null) {
+      try {
+        final List<int> value =
+            await _setLowVoltageDisconnectDelayCharacteristic!.read();
+        if (value.isNotEmpty) {
+          final byteData = ByteData.sublistView(Uint8List.fromList(value));
+          final delay = byteData.getUint32(0, Endian.little);
+          await _updateSmartShuntData(LOW_VOLTAGE_DISCONNECT_DELAY_UUID, value);
+          return delay;
+        }
+      } catch (e) {
+        print("Error reading Low-Voltage Delay: $e");
       }
     }
     return null;
@@ -680,7 +741,7 @@ class BleService extends ChangeNotifier {
       );
     } else if (characteristicUuid == EFUSE_LIMIT_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
-        eFuseLimit: byteData.getUint16(0, Endian.little).toDouble(),
+        eFuseLimit: byteData.getFloat32(0, Endian.little),
       );
     } else if (characteristicUuid == ACTIVE_SHUNT_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(

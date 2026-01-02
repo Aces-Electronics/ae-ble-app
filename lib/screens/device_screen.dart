@@ -20,6 +20,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   late final StreamSubscription<BluetoothConnectionState>
   _connectionStateSubscription;
   late final BleService _bleService;
+  bool _isReconnecting = false;
+  Timer? _reconnectTimeoutTimer;
 
   @override
   void initState() {
@@ -30,16 +32,47 @@ class _DeviceScreenState extends State<DeviceScreen> {
       state,
     ) {
       if (state == BluetoothConnectionState.disconnected) {
+        _handleDisconnection();
+      } else if (state == BluetoothConnectionState.connected) {
         if (mounted) {
-          Navigator.of(context).pop();
+          setState(() {
+            _isReconnecting = false;
+            _reconnectTimeoutTimer?.cancel();
+          });
         }
       }
+    });
+  }
+
+  void _handleDisconnection() {
+    if (!mounted) return;
+
+    setState(() {
+      _isReconnecting = true;
+    });
+
+    // Start 5 second give-up timer
+    _reconnectTimeoutTimer?.cancel();
+    _reconnectTimeoutTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted && _isReconnecting) {
+        // Give up and kick out
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Connection lost. Returning to scan.")),
+        );
+      }
+    });
+
+    // Attempt reconnection
+    _bleService.reconnect().catchError((e) {
+      print("Manual reconnection attempt failed: $e");
     });
   }
 
   @override
   void dispose() {
     _connectionStateSubscription.cancel();
+    _reconnectTimeoutTimer?.cancel();
     // Ensure we disconnect when leaving the screen to prevent ghost connections
     _bleService.disconnect();
     super.dispose();
@@ -77,186 +110,211 @@ class _DeviceScreenState extends State<DeviceScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: StreamBuilder<SmartShunt>(
-          stream: _bleService.smartShuntStream,
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              final smartShunt = snapshot.data!;
-              return SingleChildScrollView(
-                child: Column(
-                  children: [
-                    if (smartShunt.errorState == ErrorState.eFuseTripped)
-                      Container(
-                        width: double.infinity,
-                        color: Colors.red,
-                        padding: const EdgeInsets.all(16.0),
-                        margin: const EdgeInsets.all(8.0),
-                        child: Column(
+      body: Stack(
+        children: [
+          SafeArea(
+            child: StreamBuilder<SmartShunt>(
+              stream: _bleService.smartShuntStream,
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  final smartShunt = snapshot.data!;
+                  return SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        if (smartShunt.errorState == ErrorState.eFuseTripped)
+                          Container(
+                            width: double.infinity,
+                            color: Colors.red,
+                            padding: const EdgeInsets.all(16.0),
+                            margin: const EdgeInsets.all(8.0),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.warning,
+                                  color: Colors.white,
+                                  size: 48,
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  "E-FUSE TRIPPED!",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 20,
+                                  ),
+                                ),
+                                const Text(
+                                  "LOAD DISCONNECTED",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  "Check for short circuits. Go to Settings > Change Shunt Settings to re-enable load.",
+                                  style: TextStyle(color: Colors.white),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(8.0),
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 8.0,
+                          mainAxisSpacing: 8.0,
+                          childAspectRatio: 0.9,
                           children: [
-                            const Icon(
-                              Icons.warning,
-                              color: Colors.white,
-                              size: 48,
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              "E-FUSE TRIPPED!",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 20,
+                            _buildInfoTile(
+                              context,
+                              'Battery Voltage',
+                              '${smartShunt.batteryVoltage.toStringAsFixed(2)} V',
+                              Icons.battery_charging_full,
+                              overrideColor: _getVoltageColor(
+                                smartShunt.batteryVoltage,
                               ),
                             ),
-                            const Text(
-                              "LOAD DISCONNECTED",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                            _buildInfoTile(
+                              context,
+                              'Battery Current',
+                              '${smartShunt.batteryCurrent.toStringAsFixed(2)} A',
+                              smartShunt.batteryCurrent > 0
+                                  ? Icons.arrow_downward
+                                  : smartShunt.batteryCurrent < 0
+                                  ? Icons.arrow_upward
+                                  : Icons.flash_on,
+                              overrideColor: _getCurrentColor(
+                                smartShunt.batteryCurrent,
+                                smartShunt.remainingCapacity,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              "Check for short circuits. Go to Settings > Change Shunt Settings to re-enable load.",
-                              style: TextStyle(color: Colors.white),
-                              textAlign: TextAlign.center,
+                            _buildInfoTile(
+                              context,
+                              'Battery Power',
+                              '${smartShunt.batteryPower.toStringAsFixed(2)} W',
+                              Icons.power,
+                              subtitle: _formatTimeLabel(
+                                smartShunt.timeRemaining,
+                                smartShunt.batteryCurrent,
+                              ),
+                              overrideColor: _getPowerColor(
+                                smartShunt.batteryPower,
+                                smartShunt.batteryVoltage,
+                                smartShunt.remainingCapacity,
+                              ),
+                            ),
+                            _buildInfoTile(
+                              context,
+                              'State of Charge (SOC)',
+                              '${(smartShunt.soc).toStringAsFixed(1)} %',
+                              Icons.battery_std,
+                              overrideColor: _getSocColor(smartShunt.soc),
+                            ),
+                            _buildInfoTile(
+                              context,
+                              'Remaining Capacity',
+                              '${smartShunt.remainingCapacity.toStringAsFixed(2)} Ah',
+                              Icons.battery_saver,
+                              // Uses SOC logic for color as requested ("do same for capacity")
+                              overrideColor: _getSocColor(smartShunt.soc),
+                            ),
+                            _buildInfoTile(
+                              context,
+                              'Starter Voltage',
+                              (smartShunt.starterBatteryVoltage >= 9.99 &&
+                                      smartShunt.starterBatteryVoltage <= 10.01)
+                                  ? 'N/A'
+                                  : '${smartShunt.starterBatteryVoltage.toStringAsFixed(2)} V',
+                              Icons.battery_alert,
+                              overrideColor: _getStarterVoltageColor(
+                                smartShunt.starterBatteryVoltage,
+                              ),
+                            ),
+                            if (!smartShunt.isCalibrated)
+                              _buildInfoTile(
+                                context,
+                                'Calibration Status',
+                                'Not Calibrated',
+                                Icons.settings,
+                                isWarning: true,
+                              ),
+                            if (smartShunt.errorState != ErrorState.normal)
+                              _buildInfoTile(
+                                context,
+                                'Error State',
+                                _getErrorStateString(smartShunt.errorState),
+                                Icons.error_outline,
+                                isWarning: true,
+                              ),
+                            _buildInfoTile(
+                              context,
+                              'Last Hour Usage',
+                              '${smartShunt.lastHourWh.toStringAsFixed(2)} Wh',
+                              Icons.history_toggle_off,
+                              overrideColor: _getUsageColor(
+                                smartShunt.lastHourWh,
+                                smartShunt.batteryVoltage,
+                                smartShunt.remainingCapacity,
+                              ),
+                            ),
+                            _buildInfoTile(
+                              context,
+                              'Last Day Usage',
+                              '${smartShunt.lastDayWh.toStringAsFixed(2)} Wh',
+                              Icons.today,
+                              overrideColor: _getUsageColor(
+                                smartShunt.lastDayWh,
+                                smartShunt.batteryVoltage,
+                                smartShunt.remainingCapacity,
+                              ),
+                            ),
+                            _buildInfoTile(
+                              context,
+                              'Last Week Usage',
+                              '${smartShunt.lastWeekWh.toStringAsFixed(2)} Wh',
+                              Icons.calendar_view_week,
+                              overrideColor: _getUsageColor(
+                                smartShunt.lastWeekWh,
+                                smartShunt.batteryVoltage,
+                                smartShunt.remainingCapacity,
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(8.0),
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 8.0,
-                      mainAxisSpacing: 8.0,
-                      childAspectRatio: 0.9,
-                      children: [
-                        _buildInfoTile(
-                          context,
-                          'Battery Voltage',
-                          '${smartShunt.batteryVoltage.toStringAsFixed(2)} V',
-                          Icons.battery_charging_full,
-                          overrideColor: _getVoltageColor(
-                            smartShunt.batteryVoltage,
-                          ),
-                        ),
-                        _buildInfoTile(
-                          context,
-                          'Battery Current',
-                          '${smartShunt.batteryCurrent.toStringAsFixed(2)} A',
-                          smartShunt.batteryCurrent > 0
-                              ? Icons.arrow_downward
-                              : smartShunt.batteryCurrent < 0
-                              ? Icons.arrow_upward
-                              : Icons.flash_on,
-                          overrideColor: _getCurrentColor(
-                            smartShunt.batteryCurrent,
-                            smartShunt.remainingCapacity,
-                          ),
-                        ),
-                        _buildInfoTile(
-                          context,
-                          'Battery Power',
-                          '${smartShunt.batteryPower.toStringAsFixed(2)} W',
-                          Icons.power,
-                          subtitle: _formatTimeLabel(
-                            smartShunt.timeRemaining,
-                            smartShunt.batteryCurrent,
-                          ),
-                          overrideColor: _getPowerColor(
-                            smartShunt.batteryPower,
-                            smartShunt.batteryVoltage,
-                            smartShunt.remainingCapacity,
-                          ),
-                        ),
-                        _buildInfoTile(
-                          context,
-                          'State of Charge (SOC)',
-                          '${(smartShunt.soc).toStringAsFixed(1)} %',
-                          Icons.battery_std,
-                          overrideColor: _getSocColor(smartShunt.soc),
-                        ),
-                        _buildInfoTile(
-                          context,
-                          'Remaining Capacity',
-                          '${smartShunt.remainingCapacity.toStringAsFixed(2)} Ah',
-                          Icons.battery_saver,
-                          // Uses SOC logic for color as requested ("do same for capacity")
-                          overrideColor: _getSocColor(smartShunt.soc),
-                        ),
-                        _buildInfoTile(
-                          context,
-                          'Starter Voltage',
-                          (smartShunt.starterBatteryVoltage >= 9.99 &&
-                                  smartShunt.starterBatteryVoltage <= 10.01)
-                              ? 'N/A'
-                              : '${smartShunt.starterBatteryVoltage.toStringAsFixed(2)} V',
-                          Icons.battery_alert,
-                          overrideColor: _getStarterVoltageColor(
-                            smartShunt.starterBatteryVoltage,
-                          ),
-                        ),
-                        if (!smartShunt.isCalibrated)
-                          _buildInfoTile(
-                            context,
-                            'Calibration Status',
-                            'Not Calibrated',
-                            Icons.settings,
-                            isWarning: true,
-                          ),
-                        if (smartShunt.errorState != ErrorState.normal)
-                          _buildInfoTile(
-                            context,
-                            'Error State',
-                            _getErrorStateString(smartShunt.errorState),
-                            Icons.error_outline,
-                            isWarning: true,
-                          ),
-                        _buildInfoTile(
-                          context,
-                          'Last Hour Usage',
-                          '${smartShunt.lastHourWh.toStringAsFixed(2)} Wh',
-                          Icons.history_toggle_off,
-                          overrideColor: _getUsageColor(
-                            smartShunt.lastHourWh,
-                            smartShunt.batteryVoltage,
-                            smartShunt.remainingCapacity,
-                          ),
-                        ),
-                        _buildInfoTile(
-                          context,
-                          'Last Day Usage',
-                          '${smartShunt.lastDayWh.toStringAsFixed(2)} Wh',
-                          Icons.today,
-                          overrideColor: _getUsageColor(
-                            smartShunt.lastDayWh,
-                            smartShunt.batteryVoltage,
-                            smartShunt.remainingCapacity,
-                          ),
-                        ),
-                        _buildInfoTile(
-                          context,
-                          'Last Week Usage',
-                          '${smartShunt.lastWeekWh.toStringAsFixed(2)} Wh',
-                          Icons.calendar_view_week,
-                          overrideColor: _getUsageColor(
-                            smartShunt.lastWeekWh,
-                            smartShunt.batteryVoltage,
-                            smartShunt.remainingCapacity,
-                          ),
-                        ),
                       ],
+                    ),
+                  );
+                } else {
+                  return const Center(child: CircularProgressIndicator());
+                }
+              },
+            ),
+          ),
+          if (_isReconnecting)
+            Container(
+              color: Colors.black54,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 16),
+                    Text(
+                      "Reconnecting...",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
-              );
-            } else {
-              return const Center(child: CircularProgressIndicator());
-            }
-          },
-        ),
+              ),
+            ),
+        ],
       ),
     );
   }

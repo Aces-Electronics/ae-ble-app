@@ -108,87 +108,114 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-class ShuntSettingsScreen extends StatelessWidget {
+class ShuntSettingsScreen extends StatefulWidget {
   final SmartShunt smartShunt;
 
   const ShuntSettingsScreen({super.key, required this.smartShunt});
 
   @override
+  State<ShuntSettingsScreen> createState() => _ShuntSettingsScreenState();
+}
+
+class _ShuntSettingsScreenState extends State<ShuntSettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch latest data on entry
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final bleService = Provider.of<BleService>(context, listen: false);
+      bleService.readLowVoltageDelay();
+      bleService.readEfuseLimit();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bleService = Provider.of<BleService>(context);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Shunt Settings')),
-      body: ListView(
-        children: [
-          SwitchListTile(
-            title: const Text('Enable Load Output'),
-            value: smartShunt.loadState,
-            onChanged: (bool value) {
-              bleService.setLoadState(value);
-            },
-          ),
-          ListTile(
-            title: const Text('Set State of Charge (SOC)'),
-            subtitle: Text('${(smartShunt.soc).toStringAsFixed(1)} %'),
-            onTap: () => _showSetSocDialog(context, smartShunt, bleService),
-          ),
-          ListTile(
-            title: const Text('Set Rated Battery Capacity'),
-            subtitle: Text('${smartShunt.ratedCapacity.toStringAsFixed(1)} Ah'),
-            onTap: () =>
-                _showRatedCapacityDialog(context, smartShunt, bleService),
-          ),
-          FutureBuilder<double?>(
-            future: bleService.readEfuseLimit(),
-            builder: (context, snapshot) {
-              final limit = snapshot.data;
-              final maxLimit = smartShunt.activeShuntRating * 0.5;
-              final subtitle = limit != null && limit > 0
-                  ? '${limit.toStringAsFixed(1)} A (Max: ${maxLimit.toStringAsFixed(0)} A)'
-                  : 'Disabled (Max: ${maxLimit.toStringAsFixed(0)} A)';
-              return ListTile(
+    return StreamBuilder<SmartShunt>(
+      stream: bleService.smartShuntStream,
+      initialData: widget.smartShunt,
+      builder: (context, snapshot) {
+        final smartShunt = snapshot.data ?? widget.smartShunt;
+        final maxLimit = smartShunt.activeShuntRating * 0.5;
+        final efuseLimit = smartShunt.eFuseLimit;
+
+        return Scaffold(
+          appBar: AppBar(title: const Text('Shunt Settings')),
+          body: ListView(
+            children: [
+              SwitchListTile(
+                title: const Text('Enable Load Output'),
+                value: smartShunt.loadState,
+                onChanged: (bool value) {
+                  bleService.setLoadState(value);
+                },
+              ),
+              ListTile(
+                title: const Text('Set State of Charge (SOC)'),
+                subtitle: Text('${(smartShunt.soc).toStringAsFixed(1)} %'),
+                onTap: () => _showSetSocDialog(context, smartShunt, bleService),
+              ),
+              ListTile(
+                title: const Text('Set Rated Battery Capacity'),
+                subtitle: Text(
+                  '${smartShunt.ratedCapacity.toStringAsFixed(1)} Ah',
+                ),
+                onTap: () =>
+                    _showRatedCapacityDialog(context, smartShunt, bleService),
+              ),
+              ListTile(
                 title: const Text('Set E-Fuse Limit'),
-                subtitle: Text(subtitle),
+                subtitle: Text(
+                  efuseLimit > 0
+                      ? '${efuseLimit.toStringAsFixed(1)} A (Max: ${maxLimit.toStringAsFixed(0)} A)'
+                      : 'Disabled (Max: ${maxLimit.toStringAsFixed(0)} A)',
+                ),
                 onTap: () => _showSetEfuseDialog(
                   context,
                   bleService,
-                  limit ?? 0.0,
+                  efuseLimit,
                   smartShunt.activeShuntRating,
                 ),
-              );
-            },
+              ),
+              ListTile(
+                title: const Text('Set Voltage Protection'),
+                subtitle: Text(
+                  'Cutoff: ${smartShunt.cutoffVoltage.toStringAsFixed(2)} V, Reconnect: ${smartShunt.reconnectVoltage.toStringAsFixed(2)} V',
+                ),
+                onTap: () => _showSetVoltageProtectionDialog(
+                  context,
+                  smartShunt,
+                  bleService,
+                ),
+              ),
+              ListTile(
+                title: const Text('Set Low-Voltage Disconnect Delay'),
+                subtitle: Text(
+                  smartShunt.lowVoltageDisconnectDelay > 0
+                      ? '${smartShunt.lowVoltageDisconnectDelay} seconds'
+                      : 'Loading...',
+                ),
+                onTap: () => _showSetDelayDialog(context, smartShunt),
+              ),
+              ListTile(
+                title: const Text('Set Device Name Suffix'),
+                subtitle: Text(
+                  smartShunt.deviceNameSuffix.isNotEmpty
+                      ? smartShunt.deviceNameSuffix
+                      : 'Not Set',
+                ),
+                onTap: () => _showSetDeviceNameSuffixDialog(
+                  context,
+                  smartShunt,
+                  bleService,
+                ),
+              ),
+            ],
           ),
-          ListTile(
-            title: const Text('Set Voltage Protection'),
-            subtitle: Text(
-              'Cutoff: ${smartShunt.cutoffVoltage.toStringAsFixed(2)} V, Reconnect: ${smartShunt.reconnectVoltage.toStringAsFixed(2)} V',
-            ),
-            onTap: () => _showSetVoltageProtectionDialog(
-              context,
-              smartShunt,
-              bleService,
-            ),
-          ),
-          ListTile(
-            title: const Text('Set Low-Voltage Disconnect Delay'),
-            subtitle: Text(
-              '${smartShunt.lowVoltageDisconnectDelay.toString()} seconds',
-            ),
-            onTap: () => _showSetDelayDialog(context, smartShunt),
-          ),
-          ListTile(
-            title: const Text('Set Device Name Suffix'),
-            subtitle: Text(
-              smartShunt.deviceNameSuffix.isNotEmpty
-                  ? smartShunt.deviceNameSuffix
-                  : 'Not Set',
-            ),
-            onTap: () =>
-                _showSetDeviceNameSuffixDialog(context, smartShunt, bleService),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -615,6 +642,7 @@ class _LowVoltageDelayDropdownState extends State<LowVoltageDelayDropdown> {
   final Map<String, int> delayOptions = {
     '1 Second': 1,
     '10 Seconds': 10,
+    '30 Seconds': 30,
     '1 Minute': 60,
     '5 Minutes': 300,
     '10 Minutes': 600,
