@@ -1,4 +1,5 @@
 import 'package:ae_ble_app/models/smart_shunt.dart';
+import 'package:ae_ble_app/models/temp_sensor.dart';
 import 'package:ae_ble_app/screens/ota_update_screen.dart';
 import 'package:ae_ble_app/screens/qr_scan_screen.dart';
 import 'package:ae_ble_app/services/ble_service.dart';
@@ -12,22 +13,174 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final bleService = Provider.of<BleService>(context);
 
-    return StreamBuilder<SmartShunt>(
-      stream: bleService.smartShuntStream,
-      builder: (context, snapshot) {
-        final smartShunt = snapshot.data;
-        if (smartShunt == null) {
+    if (bleService.currentDeviceType == DeviceType.tempSensor) {
+      return StreamBuilder<TempSensor>(
+        stream: bleService.tempSensorStream,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Sensor Settings')),
+              body: const Center(child: CircularProgressIndicator()),
+            );
+          }
+          final sensor = snapshot.data!;
           return Scaffold(
-            appBar: AppBar(title: const Text('Settings')),
-            body: const Center(child: CircularProgressIndicator()),
-          );
-        }
+            appBar: AppBar(title: const Text('Sensor Settings')),
+            body: ListView(
+              children: [
+                // Device Name
+                ListTile(
+                  title: const Text("Device Name"),
+                  subtitle: Text(sensor.name),
+                  trailing: const Icon(Icons.edit),
+                  leading: const Icon(Icons.abc),
+                  onTap: () {
+                    TextEditingController nameController =
+                        TextEditingController(text: sensor.name);
+                    showDialog(
+                      context: context,
+                      builder: (c) {
+                        return AlertDialog(
+                          title: const Text("Edit Device Name"),
+                          content: TextField(
+                            controller: nameController,
+                            decoration: const InputDecoration(
+                              labelText: "Name",
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(c),
+                              child: const Text("Cancel"),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                bleService.setTempSensorName(
+                                  nameController.text,
+                                );
+                                Navigator.pop(c);
+                              },
+                              child: const Text("Save"),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                ),
+                const Divider(),
 
-        return Scaffold(
-          appBar: AppBar(title: const Text('Settings')),
-          body: ListView(
+                // Sleep Interval
+                ListTile(
+                  title: const Text("Sleep Interval"),
+                  subtitle: Text("${sensor.sleepIntervalMs / 60000} minutes"),
+                  trailing: const Icon(Icons.arrow_forward_ios),
+                  leading: const Icon(Icons.timer),
+                  onTap: () async {
+                    showDialog(
+                      context: context,
+                      builder: (c) {
+                        return SimpleDialog(
+                          title: const Text("Set Sleep Interval"),
+                          children: [1, 5, 15, 30, 60, 120]
+                              .map(
+                                (m) => SimpleDialogOption(
+                                  child: Text("$m minute${m > 1 ? 's' : ''}"),
+                                  onPressed: () {
+                                    bleService.setTempSensorSleep(m * 60000);
+                                    Navigator.pop(c);
+                                  },
+                                ),
+                              )
+                              .toList(),
+                        );
+                      },
+                    );
+                  },
+                ),
+                const Divider(),
+
+                // Enable Sleep Mode
+                SwitchListTile(
+                  title: const Text("Enable Sleep Mode"),
+                  subtitle: const Text(
+                    "Turn ON after pairing/setup is complete.",
+                  ),
+                  value: sensor.isPaired,
+                  onChanged: (val) {
+                    bleService.setTempSensorPaired(val);
+                  },
+                  secondary: const Icon(Icons.bedtime),
+                ),
+                const Divider(),
+
+                // Pair with Gauge
+                ListTile(
+                  title: const Text('Pair with Gauge'),
+                  leading: const Icon(Icons.qr_code_scanner),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const QRCodeScannerScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(),
+
+                // Advanced Settings
+                ListTile(
+                  title: const Text('Advanced Settings'),
+                  subtitle: const Text('Factory Reset'),
+                  leading: const Icon(Icons.settings_applications),
+                  trailing: const Icon(Icons.arrow_forward_ios),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const AdvancedSettingsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(),
+
+                // Firmware Update
+                ListTile(
+                  title: const Text('Firmware Update'),
+                  leading: const Icon(Icons.system_update),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const OtaUpdateScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    }
+
+    // Default Shunt View
+    return Scaffold(
+      appBar: AppBar(title: const Text('Settings')),
+      body: StreamBuilder<SmartShunt>(
+        stream: bleService.smartShuntStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final smartShunt = snapshot.data!;
+
+          return ListView(
             children: [
-              // 1. ESP-NOW MAC (Visible at top)
+              // 1. ESP-NOW MAC
               FutureBuilder<String?>(
                 future: bleService.readEspNowMac(),
                 builder: (context, snapshot) {
@@ -40,7 +193,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               const Divider(),
 
-              // 2. Load Control (High Visibility)
+              // 2. Load Control
               SwitchListTile(
                 title: const Text('Enable Load Output'),
                 subtitle: Text(
@@ -57,7 +210,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               const Divider(),
 
-              // 3. Pair with Gauge (Moved up)
+              // 3. Pair with Gauge
               ListTile(
                 title: const Text('Pair with Gauge'),
                 leading: const Icon(Icons.qr_code_scanner),
@@ -118,9 +271,9 @@ class SettingsScreen extends StatelessWidget {
                 },
               ),
             ],
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -541,15 +694,27 @@ class AdvancedSettingsScreen extends StatelessWidget {
         children: [
           ListTile(
             leading: const Icon(Icons.link_off, color: Colors.orange),
-            title: const Text('Reset Pairing'),
-            subtitle: const Text('Clear Gauge Pairing (Discovery Mode)'),
+            title: Text(
+              bleService.currentDeviceType == DeviceType.tempSensor
+                  ? 'Factory Reset Device'
+                  : 'Reset Pairing',
+            ),
+            subtitle: Text(
+              bleService.currentDeviceType == DeviceType.tempSensor
+                  ? 'Wipe NVS, Clear Name, and Restart'
+                  : 'Clear Gauge Pairing (Discovery Mode)',
+            ),
             onTap: () async {
+              final isTemp =
+                  bleService.currentDeviceType == DeviceType.tempSensor;
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text("Reset Pairing?"),
-                  content: const Text(
-                    "This will clear the stored Gauge MAC address. The Shunt will revert to Discovery Mode (Yellow Beacon).",
+                  title: Text(isTemp ? "Factory Reset?" : "Reset Pairing?"),
+                  content: Text(
+                    isTemp
+                        ? "This will wipe all settings details (Name, Pairing, Calibration) and restart the sensor."
+                        : "This will clear the stored Gauge MAC address. The Shunt will revert to Discovery Mode (Yellow Beacon).",
                   ),
                   actions: [
                     TextButton(
@@ -558,9 +723,11 @@ class AdvancedSettingsScreen extends StatelessWidget {
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text(
-                        "Reset",
-                        style: TextStyle(color: Colors.orange),
+                      child: Text(
+                        isTemp ? "Factory Reset" : "Reset",
+                        style: const TextStyle(
+                          color: Colors.red,
+                        ), // Red for Reset
                       ),
                     ),
                   ],
@@ -569,52 +736,16 @@ class AdvancedSettingsScreen extends StatelessWidget {
 
               if (confirm == true) {
                 try {
+                  // For Temp Sensor, 'unpair' via RESET command triggers factory reset firmware-side.
                   await bleService.unpairShunt();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Reset command sent.")),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Failed to reset: $e")),
-                  );
-                }
-              }
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.restart_alt, color: Colors.blue),
-            title: const Text('Reset Energy Statistics'),
-            subtitle: const Text('Clear Wh counters (Last Hour/Day/Week)'),
-            onTap: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text("Reset Energy Stats?"),
-                  content: const Text(
-                    "This will zero out all accumulation counters (Last Hour, Last Day, Last Week).\n\nThis action cannot be undone.",
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text("Cancel"),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text(
-                        "Reset Stats",
-                        style: TextStyle(color: Colors.blue),
+                    SnackBar(
+                      content: Text(
+                        isTemp
+                            ? "Factory Reset command sent."
+                            : "Reset command sent.",
                       ),
                     ),
-                  ],
-                ),
-              );
-
-              if (confirm == true) {
-                try {
-                  await bleService.resetEnergyStats();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Energy stats reset.")),
                   );
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -624,56 +755,101 @@ class AdvancedSettingsScreen extends StatelessWidget {
               }
             },
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.delete_forever, color: Colors.red),
-            title: const Text('Factory Reset Device'),
-            subtitle: const Text('Wipe ALL Data and Reboot'),
-            onTap: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text("Factory Reset Device?"),
-                  content: const Text(
-                    "WARNING: This will wipe ALL settings (Calibration, Capacity, WiFi, Pairing, etc.) and reboot the device.\n\nThis action cannot be undone.",
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text("Cancel"),
+          if (bleService.currentDeviceType != DeviceType.tempSensor) ...[
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.restart_alt, color: Colors.blue),
+              title: const Text('Reset Energy Statistics'),
+              subtitle: const Text('Clear Wh counters (Last Hour/Day/Week)'),
+              onTap: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text("Reset Energy Stats?"),
+                    content: const Text(
+                      "This will zero out all accumulation counters (Last Hour, Last Day, Last Week).\n\nThis action cannot be undone.",
                     ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text(
-                        "FACTORY RESET",
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text("Cancel"),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text(
+                          "Reset Stats",
+                          style: TextStyle(color: Colors.blue),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              );
+                    ],
+                  ),
+                );
 
-              if (confirm == true) {
-                try {
-                  await bleService.factoryResetShunt();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Factory Reset command sent. Device will reboot.",
-                      ),
-                    ),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Failed to reset: $e")),
-                  );
+                if (confirm == true) {
+                  try {
+                    await bleService.resetEnergyStats();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Energy stats reset.")),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Failed to reset: $e")),
+                    );
+                  }
                 }
-              }
-            },
-          ),
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text('Factory Reset Device'),
+              subtitle: const Text('Wipe ALL Data and Reboot'),
+              onTap: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text("Factory Reset Device?"),
+                    content: const Text(
+                      "WARNING: This will wipe ALL settings (Calibration, Capacity, WiFi, Pairing, etc.) and reboot the device.\n\nThis action cannot be undone.",
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text("Cancel"),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text(
+                          "FACTORY RESET",
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true) {
+                  try {
+                    await bleService.factoryResetShunt();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Factory Reset command sent. Device will reboot.",
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Failed to reset: $e")),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -749,6 +925,121 @@ class _LowVoltageDelayDropdownState extends State<LowVoltageDelayDropdown> {
       items: delayOptions.keys.map<DropdownMenuItem<String>>((String value) {
         return DropdownMenuItem<String>(value: value, child: Text(value));
       }).toList(),
+    );
+  }
+}
+
+class TempSensorSettingsScreen extends StatelessWidget {
+  final TempSensor sensor;
+  const TempSensorSettingsScreen({super.key, required this.sensor});
+
+  @override
+  Widget build(BuildContext context) {
+    final bleService = Provider.of<BleService>(context, listen: false);
+    return Scaffold(
+      appBar: AppBar(title: const Text("Settings")),
+      body: ListView(
+        children: [
+          ListTile(
+            title: const Text("Device Name"),
+            subtitle: Text(sensor.name),
+            trailing: const Icon(Icons.edit),
+            leading: const Icon(Icons.abc),
+            onTap: () {
+              TextEditingController nameController = TextEditingController(
+                text: sensor.name,
+              );
+              showDialog(
+                context: context,
+                builder: (c) {
+                  return AlertDialog(
+                    title: const Text("Edit Device Name"),
+                    content: TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: "Name"),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(c),
+                        child: const Text("Cancel"),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          bleService.setTempSensorName(nameController.text);
+                          Navigator.pop(c);
+                        },
+                        child: const Text("Save"),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+          const Divider(),
+          ListTile(
+            title: const Text("Sleep Interval"),
+            subtitle: Text("${sensor.sleepIntervalMs / 60000} minutes"),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            leading: const Icon(Icons.timer),
+            onTap: () async {
+              showDialog(
+                context: context,
+                builder: (c) {
+                  return SimpleDialog(
+                    title: const Text("Set Sleep Interval"),
+                    children: [15, 30, 60, 120]
+                        .map(
+                          (m) => SimpleDialogOption(
+                            child: Text("$m minutes"),
+                            onPressed: () {
+                              bleService.setTempSensorSleep(m * 60000);
+                              Navigator.pop(c);
+                            },
+                          ),
+                        )
+                        .toList(),
+                  );
+                },
+              );
+            },
+          ),
+          const Divider(),
+          SwitchListTile(
+            title: const Text("Enable Sleep Mode"),
+            subtitle: const Text("Turn ON after pairing/setup is complete."),
+            value: sensor.isPaired,
+            onChanged: (val) {
+              bleService.setTempSensorPaired(val);
+            },
+            secondary: const Icon(Icons.bedtime),
+          ),
+          const Divider(),
+          ListTile(
+            title: const Text('Pair with Gauge'),
+            leading: const Icon(Icons.qr_code_scanner),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const QRCodeScannerScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(),
+          ListTile(
+            title: const Text('Firmware Update'),
+            leading: const Icon(Icons.system_update),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const OtaUpdateScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }

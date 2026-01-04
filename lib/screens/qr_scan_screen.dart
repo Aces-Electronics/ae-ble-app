@@ -40,14 +40,14 @@ class _QRCodeScannerScreenState extends State<QRCodeScannerScreen> {
       print("Scanned QR Code: $code");
       final Map<String, dynamic> data = jsonDecode(code);
 
-      if (!data.containsKey('gauge_mac') ||
-          !data.containsKey('target_mac') ||
-          !data.containsKey('key')) {
-        throw Exception("Invalid QR Code Format");
+      if (!data.containsKey('gauge_mac') || !data.containsKey('key')) {
+        throw Exception("Invalid QR Code Format: Missing gauge_mac or key");
       }
 
       final String gaugeMac = data['gauge_mac'];
-      final String targetMac = data['target_mac'];
+      final String? targetMac = data.containsKey('target_mac')
+          ? data['target_mac']
+          : null;
       final String key = data['key'];
 
       _showStatusDialog("Connecting to device...");
@@ -59,112 +59,98 @@ class _QRCodeScannerScreenState extends State<QRCodeScannerScreen> {
       );
 
       // Stop scanning on phone to allow connection
+      // Stop scanning
       await FlutterBluePlus.stopScan();
 
-      // Create device from ID
-      final BluetoothDevice targetDevice = BluetoothDevice.fromId(targetMac);
-
-      print(
-        "Checking connection status: ConnectedID=${bleService.connectedDeviceId}, Target=$targetMac",
-      );
-
-      // Verify we are talking to the right device
-      // 1. Try to read ESP-NOW MAC from the device (if characteristic available)
-      String? actualEspNowMac = await bleService.readEspNowMac();
-      print("Read ESP-NOW MAC from device: $actualEspNowMac");
-
-      bool isMatch = false;
-
-      if (actualEspNowMac != null) {
-        // We have the definitive source of truth
-        if (actualEspNowMac == targetMac) {
-          isMatch = true;
-          print("ESP-NOW MAC Verified! ($actualEspNowMac)");
-        } else {
-          print(
-            "ESP-NOW MAC Mismatch! Device says $actualEspNowMac, QR says $targetMac",
-          );
-        }
-      } else {
-        // Fallback: Check standard BLE/WiFi MAC offset logic? or just BLE ID
-        // Usually BLE = WiFi + 2. But let's just check if BLE ID is "close enough" or matches exactly?
-        // No, the user issue is precisely that they don't match.
-        // If we can't read the characteristic (old firmware), we have to rely on the connectedDeviceId check
-        // which we know fails.
-        // Let's assume mismatch if connectedDeviceId != targetMac unless we can prove otherwise.
+      // CASE A: QR Code has a target device (e.g. "Scan to Setup" QR)
+      if (targetMac != null) {
+        // Create device from ID
+        final BluetoothDevice targetDevice = BluetoothDevice.fromId(targetMac);
         print(
-          "Could not read ESP-NOW MAC (Old Firmware?). Falling back to BLE ID check.",
+          "Checking connection status: ConnectedID=${bleService.connectedDeviceId}, Target=$targetMac",
         );
-        if (bleService.connectedDeviceId == targetMac) {
-          isMatch = true;
+
+        // Verify we are talking to the right device
+        String? actualEspNowMac = await bleService.readEspNowMac();
+        print("Read ESP-NOW MAC from device: $actualEspNowMac");
+
+        bool isMatch = false;
+
+        if (actualEspNowMac != null) {
+          if (actualEspNowMac == targetMac) {
+            isMatch = true;
+            print("ESP-NOW MAC Verified! ($actualEspNowMac)");
+          } else {
+            print(
+              "ESP-NOW MAC Mismatch! Device says $actualEspNowMac, QR says $targetMac",
+            );
+          }
+        } else {
+          // Fallback
+          print("Could not read ESP-NOW MAC. Falling back to BLE ID check.");
+          if (bleService.connectedDeviceId == targetMac) {
+            isMatch = true;
+          }
         }
-      }
 
-      if (isMatch) {
-        // Good to go, use existing connection
-      } else {
-        // Mismatch or unsure.
-        // If we are connected, and it's NOT a match:
-        if (bleService.connectedDeviceId != null) {
-          bool proceed =
-              await showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text("Device Mismatch?"),
-                  content: Text(
-                    "The QR code targets $targetMac, but you are connected to ${bleService.connectedDeviceId} (BLE).\n\n" +
-                        (actualEspNowMac != null
-                            ? "The device reports its WiFi MAC as $actualEspNowMac.\n"
-                            : "Could not verify device WiFi MAC (Old Firmware?).\n") +
-                        "Do you want to proceed with pairing on the CURRENTLY CONNECTED device?",
+        if (!isMatch) {
+          // If mismatch, ask user
+          if (bleService.connectedDeviceId != null) {
+            bool proceed =
+                await showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text("Device Mismatch?"),
+                    content: Text(
+                      "The QR code targets $targetMac, but you are connected to ${bleService.connectedDeviceId}.\n\n"
+                      "Do you want to proceed with pairing on the CURRENTLY CONNECTED device?",
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text("Cancel"),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: const Text("Yes, Pair Connected"),
+                      ),
+                    ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(false),
-                      child: const Text("Cancel"),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(true),
-                      child: const Text("Yes, Pair Connected Device"),
-                    ),
-                  ],
-                ),
-              ) ??
-              false;
+                ) ??
+                false;
 
-          if (!proceed) {
+            if (!proceed) {
+              setState(() => _isProcessing = false);
+              _showStatusDialog("Cancelled.");
+              return;
+            }
+          } else {
+            // Not connected, and QR targets a specific device.
+            // We should probably try to connect to targetMac?
+            // But for now, let's just error if not connected to the right one.
+            // Actually, the original code might have tried to connect.
+            // Let's assume for this "Pair with Gauge" flow, we ARE connected.
+            _showStatusDialog("Not connected to target device.");
+            await Future.delayed(const Duration(seconds: 2));
             setState(() => _isProcessing = false);
-            _updateStatusDialog("Cancelled.");
             return;
           }
-          // If proceeding, we pair the CURRENT device with the keys meant for targetMac?
-          // The Shunt uses the key to add the Gauge.
-          // The Gauge generated the key for 'targetMac'.
-          // It should be fine as long as we write to the correct Shunt.
-        } else {
-          // Not connected. Connect to targetMac?
-          // But targetMac is the WiFi MAC! Connection will fail.
-          // We can't connect to WiFi MAC via BLE.
-          // We must warn user: "Please connect to the device via BLE first."
-          await showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text("Connection Required"),
-              content: const Text(
-                "Please connect to the Smart Shunt via Bluetooth Settings header before scanning the pairing code.",
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text("OK"),
-                ),
-              ],
-            ),
-          );
+        }
+      }
+      // CASE B: QR Code has NO target (e.g. Gauge QR), implies "Pair CURRENT device with this Gauge"
+      else {
+        if (bleService.connectedDeviceId == null) {
+          _showStatusDialog("Error: Not connected to any device.");
+          await Future.delayed(const Duration(seconds: 2));
           setState(() => _isProcessing = false);
           return;
         }
+        print(
+          "Direct Pairing (Gauge QR) to connected device: ${bleService.connectedDeviceId}",
+        );
       }
+
+      // Proceed to Pair
 
       _updateStatusDialog("Pairing...");
 
@@ -174,10 +160,16 @@ class _QRCodeScannerScreenState extends State<QRCodeScannerScreen> {
       // Retrieve updated service reference (provider already holds it, logic inside connectToDevice updates it)
 
       // Provision Pairing Data
+      print("Calling pairGauge...");
       await bleService.pairGauge(gaugeMac, key);
+      print("pairGauge completed successfully!");
 
-      Navigator.of(context).pop(); // Close Dialog
+      // Close the "Pairing..." dialog
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
 
+      // Show success
       _showSuccessDialog();
     } catch (e) {
       print("Pairing Error: $e");

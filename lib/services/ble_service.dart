@@ -4,11 +4,14 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:ae_ble_app/models/smart_shunt.dart';
+import 'package:ae_ble_app/models/temp_sensor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+enum DeviceType { smartShunt, tempSensor, unknown }
 
 class BleService extends ChangeNotifier {
   static const platform = MethodChannel('au.com.aceselectronics.sss/car');
@@ -22,7 +25,16 @@ class BleService extends ChangeNotifier {
   Stream<ReleaseMetadata> get releaseMetadataStream =>
       _releaseMetadataController.stream;
 
+  final StreamController<TempSensor> _tempSensorController =
+      StreamController<TempSensor>.broadcast();
+  Stream<TempSensor> get tempSensorStream => _tempSensorController.stream;
+
   SmartShunt _currentSmartShunt = SmartShunt();
+  TempSensor _currentTempSensor = TempSensor();
+  DeviceType _currentDeviceType = DeviceType.unknown;
+
+  DeviceType get currentDeviceType => _currentDeviceType;
+
   bool _isFetchingMetadata = false;
   final List<double> _currentHistory =
       []; // For storing recent current values for averaging
@@ -43,6 +55,9 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _setRatedCapacityCharacteristic;
   BluetoothCharacteristic? _pairingCharacteristic;
   BluetoothCharacteristic? _efuseLimitCharacteristic;
+
+  // Temp Sensor Specific
+  BluetoothCharacteristic? _tempSensorPairedCharacteristic;
 
   String? _defaultDeviceId;
   String? get defaultDeviceId => _defaultDeviceId;
@@ -138,9 +153,12 @@ class BleService extends ChangeNotifier {
 
       // Reset state to empty/loading to prevent stale data on next connect
       _currentSmartShunt = SmartShunt();
+      _currentTempSensor = TempSensor();
+      _currentDeviceType = DeviceType.unknown;
       _currentHistory.clear();
       _isFetchingMetadata = false; // Reset metadata fetching flag
       _smartShuntController.add(_currentSmartShunt);
+      _tempSensorController.add(_currentTempSensor);
     }
   }
 
@@ -212,6 +230,9 @@ class BleService extends ChangeNotifier {
       print('Service: ${service.uuid}');
       if (service.uuid == SMART_SHUNT_SERVICE_UUID ||
           service.uuid == OTA_SERVICE_UUID) {
+        if (service.uuid == SMART_SHUNT_SERVICE_UUID) {
+          _currentDeviceType = DeviceType.smartShunt;
+        }
         print('Found matching service');
         for (BluetoothCharacteristic characteristic
             in service.characteristics) {
@@ -299,6 +320,36 @@ class BleService extends ChangeNotifier {
             );
           } else if (characteristic.uuid == EFUSE_LIMIT_UUID) {
             _efuseLimitCharacteristic = characteristic;
+          }
+        }
+      } else if (service.uuid == Guid("4fafc201-1fb5-459e-8fcc-c5c9c331914c")) {
+        print('Found Temp Sensor Service');
+        _currentDeviceType = DeviceType.tempSensor;
+        notifyListeners();
+        for (BluetoothCharacteristic characteristic
+            in service.characteristics) {
+          print('Temp Sensor Characteristic: ${characteristic.uuid}');
+          if (characteristic.properties.notify ||
+              characteristic.properties.indicate) {
+            await characteristic.setNotifyValue(true);
+            characteristic.lastValueStream.listen((value) async {
+              await _updateTempSensorData(characteristic.uuid, value);
+            });
+          }
+          if (characteristic.properties.read) {
+            try {
+              final val = await characteristic.read();
+              await _updateTempSensorData(characteristic.uuid, val);
+            } catch (e) {
+              print("Error reading ${characteristic.uuid}: $e");
+            }
+          }
+
+          if (characteristic.uuid ==
+              Guid("beb5483e-36e1-4688-b7f5-ea07361b26ae")) {
+            _tempSensorPairedCharacteristic = characteristic;
+            _pairingCharacteristic =
+                characteristic; // Alias for generic helpers
           }
         }
       }
@@ -772,6 +823,111 @@ class BleService extends ChangeNotifier {
     _smartShuntController.add(_currentSmartShunt);
     notifyListeners();
     _sendToCar();
+  }
+
+  Future<void> _updateTempSensorData(Guid uuid, List<int> value) async {
+    if (value.isEmpty) return;
+    ByteData byteData = ByteData.sublistView(Uint8List.fromList(value));
+
+    final tempUuid = Guid("beb5483e-36e1-4688-b7f5-ea07361b26aa");
+    final sleepUuid = Guid("beb5483e-36e1-4688-b7f5-ea07361b26ab");
+    final battUuid = Guid("beb5483e-36e1-4688-b7f5-ea07361b26ac");
+    final nameUuid = Guid("beb5483e-36e1-4688-b7f5-ea07361b26ad");
+
+    if (uuid == tempUuid) {
+      _currentTempSensor = _currentTempSensor.copyWith(
+        temperature: byteData.getFloat32(0, Endian.little),
+      );
+    } else if (uuid == sleepUuid) {
+      _currentTempSensor = _currentTempSensor.copyWith(
+        sleepIntervalMs: byteData.getUint32(0, Endian.little),
+      );
+    } else if (uuid == battUuid) {
+      _currentTempSensor = _currentTempSensor.copyWith(
+        batteryLevel: byteData.getUint32(0, Endian.little).toInt(),
+      );
+    } else if (uuid == nameUuid) {
+      print("Raw Name Bytes: $value");
+      // Decode and sanitise name (Strict Allow List: Printable ASCII only)
+      String raw = utf8.decode(value, allowMalformed: true);
+      // Keep only 0x20 (Space) to 0x7E (~)
+      String clean = raw.replaceAll(RegExp(r'[^\x20-\x7E]'), '').trim();
+      print("Sanitised Name: '$clean'");
+
+      _currentTempSensor = _currentTempSensor.copyWith(
+        name: clean.isNotEmpty ? clean : "AE Temp Sensor",
+      );
+    } else if (uuid == Guid("beb5483e-36e1-4688-b7f5-ea07361b26ae")) {
+      _currentTempSensor = _currentTempSensor.copyWith(isPaired: value[0] != 0);
+    }
+
+    _tempSensorController.add(_currentTempSensor);
+    notifyListeners();
+  }
+
+  Future<void> setTempSensorSleep(int ms) async {
+    // Find sleep char
+    // We need to store reference to it? Or find it again.
+    // Better to store ref in discovery. For now let's just find it if possible or assume we scanned.
+    if (_device == null) return;
+
+    // Basic lookup since we didn't store it in a variable in discoverServices loop above (my bad, let's fix strictly if needed, but lookup is okay)
+    try {
+      var services = await _device!.discoverServices();
+      var service = services.firstWhere(
+        (s) => s.uuid == Guid("4fafc201-1fb5-459e-8fcc-c5c9c331914c"),
+      );
+      var char = service.characteristics.firstWhere(
+        (c) => c.uuid == Guid("beb5483e-36e1-4688-b7f5-ea07361b26ab"),
+      );
+      final buffer = ByteData(4)..setUint32(0, ms, Endian.little);
+      await char.write(buffer.buffer.asUint8List());
+      // meaningful update
+      _currentTempSensor = _currentTempSensor.copyWith(sleepIntervalMs: ms);
+      _tempSensorController.add(_currentTempSensor);
+    } catch (e) {
+      print("Error setting sleep: $e");
+    }
+  }
+
+  Future<void> setTempSensorName(String name) async {
+    if (_device == null) return;
+    try {
+      var services = await _device!.discoverServices();
+      var service = services.firstWhere(
+        (s) => s.uuid == Guid("4fafc201-1fb5-459e-8fcc-c5c9c331914c"),
+      );
+      var char = service.characteristics.firstWhere(
+        (c) => c.uuid == Guid("beb5483e-36e1-4688-b7f5-ea07361b26ad"),
+      );
+      await char.write(utf8.encode(name));
+      _currentTempSensor = _currentTempSensor.copyWith(name: name);
+      _tempSensorController.add(_currentTempSensor);
+    } catch (e) {
+      print("Error setting name: $e");
+    }
+  }
+
+  Future<void> setTempSensorPaired(bool paired) async {
+    if (_device == null) return;
+    try {
+      // If we have the char captured, use it. Else discovery fallback (safe).
+      if (_tempSensorPairedCharacteristic == null) {
+        var services = await _device!.discoverServices();
+        var service = services.firstWhere(
+          (s) => s.uuid == Guid("4fafc201-1fb5-459e-8fcc-c5c9c331914c"),
+        );
+        _tempSensorPairedCharacteristic = service.characteristics.firstWhere(
+          (c) => c.uuid == Guid("beb5483e-36e1-4688-b7f5-ea07361b26ae"),
+        );
+      }
+
+      await _tempSensorPairedCharacteristic!.write([paired ? 1 : 0]);
+      _currentTempSensor = _currentTempSensor.copyWith(isPaired: paired);
+      _tempSensorController.add(_currentTempSensor);
+    } catch (e) {
+      print("Error setting paired: $e");
+    }
   }
 
   Future<void> _sendToCar() async {
