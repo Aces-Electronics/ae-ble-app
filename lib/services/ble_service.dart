@@ -517,6 +517,27 @@ class BleService extends ChangeNotifier {
     }
   }
 
+  Future<void> resetEnergyStats() async {
+    print("Sending RESET_ENERGY command to Shunt...");
+
+    // Wait for pairing characteristic if null (it handles general commands)
+    int retries = 0;
+    while (_pairingCharacteristic == null && retries < 20) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      retries++;
+    }
+
+    try {
+      await _safeWrite(
+        _pairingCharacteristic,
+        utf8.encode("RESET_ENERGY"),
+        "Reset Energy",
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> pairGauge(String gaugeMac, String key) async {
     final payload = jsonEncode({"gauge_mac": gaugeMac, "key": key});
     print("Pairing: Writing payload to characteristic: $payload");

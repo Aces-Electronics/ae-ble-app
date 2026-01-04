@@ -40,7 +40,24 @@ class SettingsScreen extends StatelessWidget {
               ),
               const Divider(),
 
-              // 2. Pair with Gauge (Moved up)
+              // 2. Load Control (High Visibility)
+              SwitchListTile(
+                title: const Text('Enable Load Output'),
+                subtitle: Text(
+                  smartShunt.loadState ? "Load is ON" : "Load is OFF",
+                  style: TextStyle(
+                    color: smartShunt.loadState ? Colors.green : Colors.grey,
+                  ),
+                ),
+                secondary: const Icon(Icons.power_settings_new),
+                value: smartShunt.loadState,
+                onChanged: (bool value) {
+                  bleService.setLoadState(value);
+                },
+              ),
+              const Divider(),
+
+              // 3. Pair with Gauge (Moved up)
               ListTile(
                 title: const Text('Pair with Gauge'),
                 leading: const Icon(Icons.qr_code_scanner),
@@ -145,13 +162,6 @@ class _ShuntSettingsScreenState extends State<ShuntSettingsScreen> {
           appBar: AppBar(title: const Text('Shunt Settings')),
           body: ListView(
             children: [
-              SwitchListTile(
-                title: const Text('Enable Load Output'),
-                value: smartShunt.loadState,
-                onChanged: (bool value) {
-                  bleService.setLoadState(value);
-                },
-              ),
               ListTile(
                 title: const Text('Set State of Charge (SOC)'),
                 subtitle: Text('${(smartShunt.soc).toStringAsFixed(1)} %'),
@@ -562,6 +572,49 @@ class AdvancedSettingsScreen extends StatelessWidget {
                   await bleService.unpairShunt();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text("Reset command sent.")),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Failed to reset: $e")),
+                  );
+                }
+              }
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.restart_alt, color: Colors.blue),
+            title: const Text('Reset Energy Statistics'),
+            subtitle: const Text('Clear Wh counters (Last Hour/Day/Week)'),
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Reset Energy Stats?"),
+                  content: const Text(
+                    "This will zero out all accumulation counters (Last Hour, Last Day, Last Week).\n\nThis action cannot be undone.",
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text("Cancel"),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text(
+                        "Reset Stats",
+                        style: TextStyle(color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                try {
+                  await bleService.resetEnergyStats();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Energy stats reset.")),
                   );
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
