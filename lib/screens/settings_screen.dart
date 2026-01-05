@@ -193,6 +193,18 @@ class SettingsScreen extends StatelessWidget {
               ),
               const Divider(),
 
+              // Diagnostics
+              ListTile(
+                title: const Text('Diagnostics'),
+                subtitle: Text(
+                  smartShunt.diagnostics.isNotEmpty
+                      ? smartShunt.diagnostics
+                      : "Waiting for update...",
+                ),
+                leading: const Icon(Icons.info_outline),
+              ),
+              const Divider(),
+
               // 2. Load Control
               SwitchListTile(
                 title: const Text('Enable Load Output'),

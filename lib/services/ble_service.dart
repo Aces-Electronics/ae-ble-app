@@ -272,15 +272,28 @@ class BleService extends ChangeNotifier {
             }
 
             try {
+              // Register listener BEFORE enabling notifications to ensure we don't miss data
+              // or fail to listen if setNotifyValue times out (but succeeds on device).
+              final subscription = characteristic.lastValueStream.listen((
+                value,
+              ) async {
+                await _updateSmartShuntData(characteristic.uuid, value);
+              });
+
+              // Keep track of subscriptions if needed, or rely on FBP cleanup
+              // For now, we let FBP manage the stream lifecycle.
+
               // Add timeout to prevent hanging on problematic characteristics
               await characteristic
                   .setNotifyValue(true)
-                  .timeout(const Duration(seconds: 2));
-              characteristic.lastValueStream.listen((value) async {
-                await _updateSmartShuntData(characteristic.uuid, value);
-              });
+                  .timeout(const Duration(seconds: 5));
+
+              // Small delay to prevent flooding the BLE command queue
+              await Future.delayed(const Duration(milliseconds: 50));
             } catch (e) {
               print('Error subscribing to ${characteristic.uuid}: $e');
+              // Note: We might want to cancel the subscription if notify failed hard,
+              // but if it's just a timeout and data is flowing (logs), keeping it is better.
             }
           }
 
@@ -301,9 +314,12 @@ class BleService extends ChangeNotifier {
               characteristic.uuid == SET_RATED_CAPACITY_CHAR_UUID ||
               characteristic.uuid == EFUSE_LIMIT_UUID ||
               characteristic.uuid == ACTIVE_SHUNT_UUID ||
+              characteristic.uuid == RUN_FLAT_TIME_UUID ||
               characteristic.uuid == CURRENT_VERSION_UUID ||
               characteristic.uuid == DEVICE_NAME_SUFFIX_UUID ||
-              characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID) {
+              characteristic.uuid == DEVICE_NAME_SUFFIX_UUID ||
+              characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID ||
+              characteristic.uuid == DIAGNOSTICS_UUID) {
             try {
               if (characteristic.uuid == ERROR_STATE_UUID) {
                 final val = await characteristic.read();
@@ -614,6 +630,13 @@ class BleService extends ChangeNotifier {
         utf8.encode("RESET_ENERGY"),
         "Reset Energy",
       );
+      // Optimistically reset stats locally so UI updates immediately
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+        lastHourWh: 0,
+        lastDayWh: 0,
+        lastWeekWh: 0,
+      );
+      _smartShuntController.add(_currentSmartShunt);
     } catch (e) {
       rethrow;
     }
@@ -849,6 +872,30 @@ class BleService extends ChangeNotifier {
       _currentSmartShunt = _currentSmartShunt.copyWith(
         activeShuntRating: byteData.getUint16(0, Endian.little),
       );
+    } else if (characteristicUuid == RUN_FLAT_TIME_UUID) {
+      // Decode the run flat time string from firmware
+      // Find null terminator to get actual string length
+      final nullTerminatorIndex = value.indexOf(0);
+      final actualValue = nullTerminatorIndex != -1
+          ? value.sublist(0, nullTerminatorIndex)
+          : value;
+
+      // Decode and sanitize: remove any non-printable characters
+      String runFlatTimeStr = utf8
+          .decode(actualValue, allowMalformed: true)
+          .replaceAll(RegExp(r'[^\x20-\x7E]'), '') // Keep only printable ASCII
+          .trim();
+
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+        runFlatTimeString: runFlatTimeStr,
+      );
+    } else if (characteristicUuid == DIAGNOSTICS_UUID) {
+      String diagStr = utf8
+          .decode(value, allowMalformed: true)
+          .replaceAll(RegExp(r'[^\x20-\x7E]'), '')
+          .trim();
+
+      _currentSmartShunt = _currentSmartShunt.copyWith(diagnostics: diagStr);
     }
     _smartShuntController.add(_currentSmartShunt);
     notifyListeners();

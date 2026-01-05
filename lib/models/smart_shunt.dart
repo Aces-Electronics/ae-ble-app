@@ -57,7 +57,9 @@ class SmartShunt {
   final OtaStatus otaStatus;
   final int otaProgress;
   final String? otaErrorMessage;
-  final int? timeRemaining; // in seconds
+  final int? timeRemaining; // in seconds (legacy, kept for compatibility)
+  final String runFlatTimeString; // Firmware-provided run flat time string
+  final String diagnostics; // New field for crash/uptime info
   final double ratedCapacity;
   final double eFuseLimit;
   final int activeShuntRating;
@@ -85,6 +87,8 @@ class SmartShunt {
     this.otaProgress = 0,
     this.otaErrorMessage,
     this.timeRemaining,
+    this.runFlatTimeString = '',
+    this.diagnostics = '',
     this.ratedCapacity = 0.0,
     this.eFuseLimit = 0.0,
     this.activeShuntRating = 0,
@@ -114,6 +118,8 @@ class SmartShunt {
     int? otaProgress,
     String? otaErrorMessage,
     int? timeRemaining,
+    String? runFlatTimeString,
+    String? diagnostics,
     double? ratedCapacity,
     double? eFuseLimit,
     int? activeShuntRating,
@@ -143,6 +149,8 @@ class SmartShunt {
       otaProgress: otaProgress ?? this.otaProgress,
       otaErrorMessage: otaErrorMessage ?? this.otaErrorMessage,
       timeRemaining: timeRemaining ?? this.timeRemaining,
+      runFlatTimeString: runFlatTimeString ?? this.runFlatTimeString,
+      diagnostics: diagnostics ?? this.diagnostics,
       ratedCapacity: ratedCapacity ?? this.ratedCapacity,
       eFuseLimit: eFuseLimit ?? this.eFuseLimit,
       activeShuntRating: activeShuntRating ?? this.activeShuntRating,
@@ -151,7 +159,7 @@ class SmartShunt {
 
   @override
   String toString() {
-    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage, lastHourWh: $lastHourWh, lastDayWh: $lastDayWh, lastWeekWh: $lastWeekWh, lowVoltageDisconnectDelay: $lowVoltageDisconnectDelay, deviceNameSuffix: $deviceNameSuffix, firmwareVersion: $firmwareVersion, updateUrl: $updateUrl, otaStatus: $otaStatus, otaProgress: $otaProgress, otaErrorMessage: $otaErrorMessage, timeRemaining: $timeRemaining, ratedCapacity: $ratedCapacity)';
+    return 'SmartShunt(batteryVoltage: $batteryVoltage, batteryCurrent: $batteryCurrent, batteryPower: $batteryPower, soc: $soc, remainingCapacity: $remainingCapacity, starterBatteryVoltage: $starterBatteryVoltage, isCalibrated: $isCalibrated, errorState: $errorState, loadState: $loadState, cutoffVoltage: $cutoffVoltage, reconnectVoltage: $reconnectVoltage, lastHourWh: $lastHourWh, lastDayWh: $lastDayWh, lastWeekWh: $lastWeekWh, lowVoltageDisconnectDelay: $lowVoltageDisconnectDelay, deviceNameSuffix: $deviceNameSuffix, firmwareVersion: $firmwareVersion, updateUrl: $updateUrl, otaStatus: $otaStatus, otaProgress: $otaProgress, otaErrorMessage: $otaErrorMessage, timeRemaining: $timeRemaining, ratedCapacity: $ratedCapacity, diagnostics: $diagnostics)';
   }
 }
 
@@ -220,3 +228,5 @@ final Guid PAIRING_CHAR_UUID = Guid("ACDC1234-5678-90AB-CDEF-1234567890CB");
 final Guid EFUSE_LIMIT_UUID = Guid("BB1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C68");
 
 final Guid ACTIVE_SHUNT_UUID = Guid("CB1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C69");
+final Guid RUN_FLAT_TIME_UUID = Guid("CC1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C6A");
+final Guid DIAGNOSTICS_UUID = Guid("ACDC1234-5678-90AB-CDEF-1234567890CC");

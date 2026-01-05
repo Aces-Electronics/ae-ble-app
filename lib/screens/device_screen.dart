@@ -200,10 +200,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                     'Battery Power',
                                     '${smartShunt.batteryPower.toStringAsFixed(2)} W',
                                     Icons.power,
-                                    subtitle: _formatTimeLabel(
-                                      smartShunt.timeRemaining,
-                                      smartShunt.batteryCurrent,
-                                    ),
+                                    subtitle:
+                                        smartShunt.runFlatTimeString.isNotEmpty
+                                        ? smartShunt.runFlatTimeString
+                                        : null,
                                     overrideColor: _getPowerColor(
                                       smartShunt.batteryPower,
                                       smartShunt.batteryVoltage,
@@ -426,42 +426,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
     if (temp < -2.0) return Colors.blue;
     if (temp <= 5.0) return Colors.green; // -2 to 5
     return Colors.red; // > 5
-  }
-
-  String? _formatTimeLabel(int? seconds, double current) {
-    if (seconds == null) return null; // Wait for calc
-
-    // If current is effectively zero, don't show time
-    if (current.abs() < 0.05) return null;
-
-    final int totalHours = seconds ~/ 3600;
-    final int days = totalHours ~/ 24;
-    final int hours = totalHours % 24;
-    final int minutes = (seconds % 3600) ~/ 60;
-
-    String timeStr;
-    if (days >= 7) {
-      // Cap at > 7 days
-      timeStr = "> 7 days";
-    } else if (days > 0) {
-      // Show days and hours (e.g., "2d 7h")
-      timeStr = '${days}d ${hours}h';
-    } else if (totalHours > 0) {
-      // Show hours and minutes
-      timeStr = '${totalHours}h ${minutes}m';
-    } else if (minutes > 0) {
-      timeStr = '${minutes}m';
-    } else {
-      timeStr = "< 1m";
-    }
-
-    // Current is Positive when Charging, Negative when Discharging
-    if (current > 0) {
-      return '$timeStr to full';
-    } else if (current < 0) {
-      return '$timeStr to empty';
-    }
-    return timeStr;
   }
 
   Widget _buildInfoTile(
