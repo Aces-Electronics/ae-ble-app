@@ -152,9 +152,12 @@ class _MyHomePageState extends State<MyHomePage> {
         initialData: const [],
         builder: (context, snapshot) {
           final allDevices = snapshot.data!;
-          final aeDevices = allDevices
-              .where((element) => element.device.platformName.startsWith('AE '))
-              .toList();
+          final aeDevices = allDevices.where((element) {
+            final name = element.advertisementData.localName.isNotEmpty
+                ? element.advertisementData.localName
+                : element.device.platformName;
+            return name.startsWith('AE ') || name.startsWith('AE-');
+          }).toList();
           final otherDevicesCount = allDevices.length - aeDevices.length;
 
           return Column(
@@ -184,6 +187,13 @@ class _MyHomePageState extends State<MyHomePage> {
                     final isConnectingToThisDevice =
                         _isConnecting && _connectingDevice == result.device;
 
+                    final displayName =
+                        result.advertisementData.localName.isNotEmpty
+                        ? result.advertisementData.localName
+                        : (result.device.platformName.isNotEmpty
+                              ? result.device.platformName
+                              : 'Unknown Device');
+
                     return Card(
                       margin: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -191,11 +201,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                       child: ListTile(
                         leading: leadingIcon,
-                        title: Text(
-                          result.device.platformName.isNotEmpty
-                              ? result.device.platformName
-                              : 'Unknown Device',
-                        ),
+                        title: Text(displayName),
                         subtitle: Text(result.device.remoteId.toString()),
                         trailing: isConnectingToThisDevice
                             ? const CircularProgressIndicator()

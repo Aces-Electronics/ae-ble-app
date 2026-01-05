@@ -193,16 +193,18 @@ class BleService extends ChangeNotifier {
       if (Platform.isAndroid) {
         try {
           // Clear GATT Cache to prevent stale services (Fix for Firmware Update UUID mismatch)
+          await device.requestConnectionPriority(
+            connectionPriorityRequest: ConnectionPriority.high,
+          );
+
+          // Re-enabling GATT cache clear but AFTER priority request to see if it helps
           try {
             await device.clearGattCache();
             print("GATT Cache Cleared.");
           } catch (e) {
-            print("Failed to clear GATT cache (Normal on some devices): $e");
+            print("Failed to clear GATT cache: $e");
           }
 
-          await device.requestConnectionPriority(
-            connectionPriorityRequest: ConnectionPriority.high,
-          );
           await device.requestMtu(512);
         } catch (e) {
           print("Optimization Request Failed: $e");
@@ -224,7 +226,26 @@ class BleService extends ChangeNotifier {
       await Future.delayed(const Duration(milliseconds: 500));
     }
 
-    List<BluetoothService> services = await device.discoverServices();
+    List<BluetoothService> services = [];
+    int retryCount = 0;
+    const int maxRetries = 3;
+
+    while (retryCount < maxRetries) {
+      try {
+        services = await device.discoverServices();
+        break; // Success
+      } catch (e) {
+        retryCount++;
+        print(
+          "Error discovering services (Attempt $retryCount/$maxRetries): $e",
+        );
+        if (retryCount >= maxRetries) {
+          rethrow;
+        }
+        print("Retrying service discovery in 200ms...");
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    }
     print('Found ${services.length} services');
     for (BluetoothService service in services) {
       print('Service: ${service.uuid}');
@@ -241,6 +262,15 @@ class BleService extends ChangeNotifier {
           // Subscribe to notifications if the characteristic has the notify property
           if (characteristic.properties.notify ||
               characteristic.properties.indicate) {
+            // Fix for Service Changed (2A05) error: Skip detailed subscription for this system char
+            // Using loose check for 2a05 to catch both short and long forms
+            if (characteristic.uuid.toString().toLowerCase().contains("2a05")) {
+              print(
+                "Skipping Service Changed characteristic subscription (2A05) - UUID: ${characteristic.uuid}",
+              );
+              continue;
+            }
+
             try {
               // Add timeout to prevent hanging on problematic characteristics
               await characteristic
