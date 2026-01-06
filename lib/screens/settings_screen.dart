@@ -202,6 +202,34 @@ class SettingsScreen extends StatelessWidget {
                       : "Waiting for update...",
                 ),
                 leading: const Icon(Icons.info_outline),
+                trailing: TextButton(
+                  child: const Text("View Log"),
+                  onPressed: () async {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Fetching Crash Log...")),
+                    );
+                    final log = await bleService.readCrashLog();
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+                    if (context.mounted) {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text("Crash Log"),
+                          content: SingleChildScrollView(
+                            child: Text(log ?? "No Log Data Returns"),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text("Close"),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                  },
+                ),
               ),
               const Divider(),
 

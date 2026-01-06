@@ -55,6 +55,7 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _setRatedCapacityCharacteristic;
   BluetoothCharacteristic? _pairingCharacteristic;
   BluetoothCharacteristic? _efuseLimitCharacteristic;
+  BluetoothCharacteristic? _crashLogCharacteristic;
 
   // Temp Sensor Specific
   BluetoothCharacteristic? _tempSensorPairedCharacteristic;
@@ -319,7 +320,8 @@ class BleService extends ChangeNotifier {
               characteristic.uuid == DEVICE_NAME_SUFFIX_UUID ||
               characteristic.uuid == DEVICE_NAME_SUFFIX_UUID ||
               characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID ||
-              characteristic.uuid == DIAGNOSTICS_UUID) {
+              characteristic.uuid == DIAGNOSTICS_UUID ||
+              characteristic.uuid == RELAY_TEMP_SENSOR_UUID) {
             try {
               if (characteristic.uuid == ERROR_STATE_UUID) {
                 final val = await characteristic.read();
@@ -348,6 +350,8 @@ class BleService extends ChangeNotifier {
             _wifiPassCharacteristic = characteristic;
           } else if (characteristic.uuid == CURRENT_VERSION_UUID) {
             _currentVersionCharacteristic = characteristic;
+          } else if (characteristic.uuid == CRASH_LOG_UUID) {
+            _crashLogCharacteristic = characteristic;
           } else if (characteristic.uuid == UPDATE_STATUS_UUID) {
             _updateStatusCharacteristic = characteristic;
           } else if (characteristic.uuid == OTA_TRIGGER_UUID) {
@@ -368,37 +372,9 @@ class BleService extends ChangeNotifier {
             _efuseLimitCharacteristic = characteristic;
           }
         }
-      } else if (service.uuid == Guid("4fafc201-1fb5-459e-8fcc-c5c9c331914c")) {
-        print('Found Temp Sensor Service');
-        _currentDeviceType = DeviceType.tempSensor;
-        notifyListeners();
-        for (BluetoothCharacteristic characteristic
-            in service.characteristics) {
-          print('Temp Sensor Characteristic: ${characteristic.uuid}');
-          if (characteristic.properties.notify ||
-              characteristic.properties.indicate) {
-            await characteristic.setNotifyValue(true);
-            characteristic.lastValueStream.listen((value) async {
-              await _updateTempSensorData(characteristic.uuid, value);
-            });
-          }
-          if (characteristic.properties.read) {
-            try {
-              final val = await characteristic.read();
-              await _updateTempSensorData(characteristic.uuid, val);
-            } catch (e) {
-              print("Error reading ${characteristic.uuid}: $e");
-            }
-          }
-
-          if (characteristic.uuid ==
-              Guid("beb5483e-36e1-4688-b7f5-ea07361b26ae")) {
-            _tempSensorPairedCharacteristic = characteristic;
-            _pairingCharacteristic =
-                characteristic; // Alias for generic helpers
-          }
-        }
       }
+    }
+  }
     }
   }
 
@@ -562,6 +538,22 @@ class BleService extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  Future<String?> readCrashLog() async {
+    if (_crashLogCharacteristic != null) {
+      try {
+        List<int> value = await _crashLogCharacteristic!.read();
+        if (value.isNotEmpty) {
+          return utf8.decode(value);
+        }
+        return "Empty Log";
+      } catch (e) {
+        print("Error reading Crash Log: $e");
+        return "Error reading log: $e";
+      }
+    }
+    return "Log not available (Char null)";
   }
 
   Future<void> unpairShunt() async {
@@ -896,6 +888,19 @@ class BleService extends ChangeNotifier {
           .trim();
 
       _currentSmartShunt = _currentSmartShunt.copyWith(diagnostics: diagStr);
+    } else if (characteristicUuid == RELAY_TEMP_SENSOR_UUID) {
+      if (value.length >= 5) {
+        // Relayed Data: Float Temp (4) + Uint8 Batt (1)
+        final byteData = ByteData.sublistView(Uint8List.fromList(value));
+        double temp = byteData.getFloat32(0, Endian.little);
+        int batt = value[4];
+
+        _currentTempSensor = _currentTempSensor.copyWith(
+          temperature: temp,
+          batteryLevel: batt,
+        );
+        _tempSensorController.add(_currentTempSensor);
+      }
     }
     _smartShuntController.add(_currentSmartShunt);
     notifyListeners();
