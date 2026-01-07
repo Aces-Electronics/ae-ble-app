@@ -1,3 +1,25 @@
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+
+final Guid DIRECT_TEMP_SENSOR_DATA_UUID = Guid(
+  "beb5483e-36e1-4688-b7f5-ea07361b26aa",
+);
+final Guid DIRECT_TEMP_SENSOR_SLEEP_UUID = Guid(
+  "beb5483e-36e1-4688-b7f5-ea07361b26ab",
+);
+final Guid DIRECT_TEMP_SENSOR_BATT_UUID = Guid(
+  "beb5483e-36e1-4688-b7f5-ea07361b26ac",
+);
+final Guid DIRECT_TEMP_SENSOR_NAME_UUID = Guid(
+  "beb5483e-36e1-4688-b7f5-ea07361b26ad",
+);
+final Guid DIRECT_TEMP_SENSOR_PAIRED_UUID = Guid(
+  "beb5483e-36e1-4688-b7f5-ea07361b26ae",
+);
+
+final Guid TEMP_SENSOR_SERVICE_UUID = Guid(
+  "4fafc201-1fb5-459e-8fcc-c5c9c331914c",
+);
+
 class TempSensor {
   final double temperature;
   final int batteryLevel; // 0-100

@@ -290,6 +290,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                       smartShunt.remainingCapacity,
                                     ),
                                   ),
+                                  _buildTempSensorTile(context, smartShunt),
+                                  _buildTpmsTile(context, smartShunt),
+                                  _buildGaugeTile(context, smartShunt),
                                 ],
                               ),
                             ],
@@ -491,6 +494,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   Widget _buildTempSensorBody(BleService bleService) {
     return StreamBuilder<TempSensor>(
       stream: bleService.tempSensorStream,
+      initialData: bleService.currentTempSensor,
       builder: (context, snapshot) {
         if (snapshot.hasData) {
           final sensor = snapshot.data!;
@@ -538,6 +542,127 @@ class _DeviceScreenState extends State<DeviceScreen> {
           return const Center(child: CircularProgressIndicator());
         }
       },
+    );
+  }
+
+  Widget _buildTempSensorTile(BuildContext context, SmartShunt smartShunt) {
+    final lastUpdate = smartShunt.tempSensorLastUpdate;
+    // 0xFFFFFFFF (4294967295) or -1 means "Never Updated"
+    final bool hasData =
+        lastUpdate != null && lastUpdate != 0xFFFFFFFF && lastUpdate != -1;
+
+    // Check Age. If age > 3 mins (180000 ms), consider it disconnected/stale.
+    final int ageMs = (hasData) ? lastUpdate : 0;
+    final bool isStale = hasData && ageMs > 180000;
+
+    String value = "--";
+    String subtitle = "Not Paired";
+    Color? color = Colors.grey;
+    IconData icon = Icons.thermostat;
+    bool isWarning = false;
+
+    if (hasData) {
+      if (isStale) {
+        value = "${smartShunt.tempSensorTemperature.toStringAsFixed(1)} °C";
+        subtitle = "Disconnected";
+        color = Colors.red;
+        isWarning = true;
+        icon = Icons.thermostat_outlined;
+      } else {
+        value = "${smartShunt.tempSensorTemperature.toStringAsFixed(1)} °C";
+        subtitle = "Bat: ${smartShunt.tempSensorBatteryLevel}%";
+        color = _getTempColor(smartShunt.tempSensorTemperature);
+        icon = Icons.thermostat;
+      }
+    }
+
+    return _buildInfoTile(
+      context,
+      smartShunt.tempSensorName ?? 'Temp Sensor',
+      value,
+      icon,
+      subtitle: subtitle,
+      overrideColor: color,
+      isWarning: isWarning,
+    );
+  }
+
+  Widget _buildTpmsTile(BuildContext context, SmartShunt smartShunt) {
+    final theme = Theme.of(context);
+    final pressures = smartShunt.tpmsPressures; // [FL, FR, RL, RR]
+    // Check if all zero (inactive)
+    bool active = pressures.any((p) => p > 0);
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(4.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              "TPMS",
+              style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+            ),
+            const SizedBox(height: 4),
+            if (!active)
+              Text(
+                "--",
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: Colors.grey,
+                ),
+              )
+            else
+              Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildTpmsVal(theme, pressures[0]),
+                      const SizedBox(width: 8),
+                      _buildTpmsVal(theme, pressures[1]),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildTpmsVal(theme, pressures[2]),
+                      const SizedBox(width: 8),
+                      _buildTpmsVal(theme, pressures[3]),
+                    ],
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTpmsVal(ThemeData theme, double val) {
+    return Text(
+      val.toStringAsFixed(0),
+      style: theme.textTheme.bodyMedium?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: val < 25 ? Colors.red : Colors.green,
+      ),
+    );
+  }
+
+  Widget _buildGaugeTile(BuildContext context, SmartShunt smartShunt) {
+    bool connected = smartShunt.gaugeLastTxSuccess;
+    // Also consider RX time? If RX is recent.
+    // User said: "Show a simple tile indicating if the device is paired with a gauge and the result of the last transmission."
+
+    return _buildInfoTile(
+      context,
+      'Gauge Status',
+      connected ? "Connected" : "No Signal",
+      Icons.speed,
+      isWarning: !connected,
+      overrideColor: connected ? Colors.green : Colors.grey,
     );
   }
 }

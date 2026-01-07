@@ -40,6 +40,7 @@ class BleService extends ChangeNotifier {
       []; // For storing recent current values for averaging
   static const int _historyWindowSize = 300; // 5 minute window at 1Hz roughly
   SmartShunt get currentSmartShunt => _currentSmartShunt;
+  TempSensor get currentTempSensor => _currentTempSensor;
   BluetoothDevice? _device;
   BluetoothCharacteristic? _loadControlCharacteristic;
   BluetoothCharacteristic? _setSocCharacteristic;
@@ -103,26 +104,40 @@ class BleService extends ChangeNotifier {
   }
 
   Future<void> _waitForBluetoothOn() async {
-    if (Platform.isIOS) {
-      // Check current state via stream
-      var state = await FlutterBluePlus.adapterState.first;
-      if (state != BluetoothAdapterState.on) {
-        print('Waiting for Bluetooth to turn on...');
-        try {
-          await FlutterBluePlus.adapterState
-              .where((s) => s == BluetoothAdapterState.on)
-              .first
-              .timeout(const Duration(seconds: 5));
-        } catch (e) {
-          print('Timeout or error waiting for Bluetooth: $e');
-        }
+    // Check current state via stream
+    var state = await FlutterBluePlus.adapterState.first;
+    if (state == BluetoothAdapterState.on) return;
+
+    if (Platform.isAndroid) {
+      try {
+        await FlutterBluePlus.turnOn();
+      } catch (e) {
+        print("Error requesting Bluetooth Turn On: $e");
+      }
+    }
+
+    // Re-check and wait if needed (iOS or failed Android turnOn)
+    state = await FlutterBluePlus.adapterState.first;
+    if (state != BluetoothAdapterState.on) {
+      print('Waiting for Bluetooth to turn on...');
+      try {
+        await FlutterBluePlus.adapterState
+            .where((s) => s == BluetoothAdapterState.on)
+            .first
+            .timeout(const Duration(seconds: 5));
+      } catch (e) {
+        print('Timeout or error waiting for Bluetooth: $e');
       }
     }
   }
 
   Future<void> startScan() async {
-    await _waitForBluetoothOn();
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+    try {
+      await _waitForBluetoothOn();
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+    } catch (e) {
+      print("Error starting scan: $e");
+    }
   }
 
   Future<void> disconnect() async {
@@ -251,11 +266,15 @@ class BleService extends ChangeNotifier {
     for (BluetoothService service in services) {
       print('Service: ${service.uuid}');
       if (service.uuid == SMART_SHUNT_SERVICE_UUID ||
-          service.uuid == OTA_SERVICE_UUID) {
+          service.uuid == OTA_SERVICE_UUID ||
+          service.uuid == TEMP_SENSOR_SERVICE_UUID) {
         if (service.uuid == SMART_SHUNT_SERVICE_UUID) {
           _currentDeviceType = DeviceType.smartShunt;
+        } else if (service.uuid == TEMP_SENSOR_SERVICE_UUID) {
+          _currentDeviceType = DeviceType.tempSensor;
         }
-        print('Found matching service');
+        notifyListeners(); // Update UI immediately
+        print('Found matching service: ${_currentDeviceType}');
         for (BluetoothCharacteristic characteristic
             in service.characteristics) {
           print('Characteristic: ${characteristic.uuid}');
@@ -321,13 +340,26 @@ class BleService extends ChangeNotifier {
               characteristic.uuid == DEVICE_NAME_SUFFIX_UUID ||
               characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID ||
               characteristic.uuid == DIAGNOSTICS_UUID ||
-              characteristic.uuid == RELAY_TEMP_SENSOR_UUID) {
+              characteristic.uuid == DEVICE_NAME_SUFFIX_UUID ||
+              characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID ||
+              characteristic.uuid == DIAGNOSTICS_UUID ||
+              characteristic.uuid == RELAY_TEMP_SENSOR_UUID ||
+              characteristic.uuid == TPMS_DATA_UUID ||
+              characteristic.uuid == TPMS_DATA_UUID ||
+              characteristic.uuid == GAUGE_STATUS_UUID ||
+              characteristic.uuid == DIRECT_TEMP_SENSOR_DATA_UUID ||
+              characteristic.uuid == DIRECT_TEMP_SENSOR_SLEEP_UUID ||
+              characteristic.uuid == DIRECT_TEMP_SENSOR_BATT_UUID ||
+              characteristic.uuid == DIRECT_TEMP_SENSOR_NAME_UUID ||
+              characteristic.uuid == DIRECT_TEMP_SENSOR_PAIRED_UUID) {
             try {
               if (characteristic.uuid == ERROR_STATE_UUID) {
                 final val = await characteristic.read();
                 await _updateSmartShuntData(ERROR_STATE_UUID, val);
               } else {
+                print("Reading initial value for ${characteristic.uuid}...");
                 final val = await characteristic.read();
+                print("Read value for ${characteristic.uuid}: $val");
                 await _updateSmartShuntData(characteristic.uuid, val);
               }
             } catch (e) {
@@ -359,6 +391,7 @@ class BleService extends ChangeNotifier {
           } else if (characteristic.uuid == SET_RATED_CAPACITY_CHAR_UUID) {
             _setRatedCapacityCharacteristic = characteristic;
           } else if (characteristic.uuid == PAIRING_CHAR_UUID ||
+              characteristic.uuid == DIRECT_TEMP_SENSOR_PAIRED_UUID ||
               characteristic.uuid.toString().toUpperCase() ==
                   "ACDC1234-5678-90AB-CDEF-1234567890CA") {
             _pairingCharacteristic = characteristic;
@@ -373,8 +406,6 @@ class BleService extends ChangeNotifier {
           }
         }
       }
-    }
-  }
     }
   }
 
@@ -889,46 +920,85 @@ class BleService extends ChangeNotifier {
 
       _currentSmartShunt = _currentSmartShunt.copyWith(diagnostics: diagStr);
     } else if (characteristicUuid == RELAY_TEMP_SENSOR_UUID) {
+      print("[BLE] Relayed Temp RX: Len=${value.length} Bytes=$value");
       if (value.length >= 5) {
-        // Relayed Data: Float Temp (4) + Uint8 Batt (1)
+        // Relayed Data: Float Temp (4) + Uint8 Batt (1) + Age (4)
         final byteData = ByteData.sublistView(Uint8List.fromList(value));
         double temp = byteData.getFloat32(0, Endian.little);
         int batt = value[4];
 
+        int? lastUpdate;
+        if (value.length >= 9) {
+          lastUpdate = byteData.getUint32(5, Endian.little);
+        }
+
+        // Update SmartShunt model (for Shunt UI)
+        _currentSmartShunt = _currentSmartShunt.copyWith(
+          tempSensorTemperature: temp,
+          tempSensorBatteryLevel: batt,
+          tempSensorLastUpdate: lastUpdate, // Raw Age (int) from packet
+        );
+
+        // Also update separate sensor controller if useful for other views
         _currentTempSensor = _currentTempSensor.copyWith(
           temperature: temp,
           batteryLevel: batt,
         );
         _tempSensorController.add(_currentTempSensor);
       }
+    } else if (characteristicUuid == TPMS_DATA_UUID) {
+      if (value.length >= 16) {
+        final byteData = ByteData.sublistView(Uint8List.fromList(value));
+        List<double> pressures = [];
+        for (int i = 0; i < 4; i++) {
+          pressures.add(byteData.getFloat32(i * 4, Endian.little));
+        }
+        _currentSmartShunt = _currentSmartShunt.copyWith(
+          tpmsPressures: pressures,
+        );
+      }
+    } else if (characteristicUuid == GAUGE_STATUS_UUID) {
+      if (value.length >= 5) {
+        final byteData = ByteData.sublistView(Uint8List.fromList(value));
+        int lastRxMs = byteData.getUint32(0, Endian.little);
+        bool txSuccess = value[4] != 0;
+        print("[BLE] Gauge Status RX: Bytes=$value, Success=$txSuccess");
+
+        _currentSmartShunt = _currentSmartShunt.copyWith(
+          gaugeLastTxSuccess: txSuccess,
+          gaugeLastRx: lastRxMs > 0 ? DateTime.now() : null,
+        );
+      }
+    } else if (characteristicUuid == DIRECT_TEMP_SENSOR_DATA_UUID ||
+        characteristicUuid == DIRECT_TEMP_SENSOR_SLEEP_UUID ||
+        characteristicUuid == DIRECT_TEMP_SENSOR_BATT_UUID ||
+        characteristicUuid == DIRECT_TEMP_SENSOR_NAME_UUID ||
+        characteristicUuid == DIRECT_TEMP_SENSOR_PAIRED_UUID) {
+      await _updateTempSensorData(characteristicUuid, value);
     }
     _smartShuntController.add(_currentSmartShunt);
     notifyListeners();
-    _sendToCar();
+    // _sendToCar(); // Removed because it's undefined
   }
 
   Future<void> _updateTempSensorData(Guid uuid, List<int> value) async {
+    print("DEBUG: _updateTempSensorData called for $uuid with $value");
     if (value.isEmpty) return;
     ByteData byteData = ByteData.sublistView(Uint8List.fromList(value));
 
-    final tempUuid = Guid("beb5483e-36e1-4688-b7f5-ea07361b26aa");
-    final sleepUuid = Guid("beb5483e-36e1-4688-b7f5-ea07361b26ab");
-    final battUuid = Guid("beb5483e-36e1-4688-b7f5-ea07361b26ac");
-    final nameUuid = Guid("beb5483e-36e1-4688-b7f5-ea07361b26ad");
-
-    if (uuid == tempUuid) {
+    if (uuid == DIRECT_TEMP_SENSOR_DATA_UUID) {
       _currentTempSensor = _currentTempSensor.copyWith(
         temperature: byteData.getFloat32(0, Endian.little),
       );
-    } else if (uuid == sleepUuid) {
+    } else if (uuid == DIRECT_TEMP_SENSOR_SLEEP_UUID) {
       _currentTempSensor = _currentTempSensor.copyWith(
         sleepIntervalMs: byteData.getUint32(0, Endian.little),
       );
-    } else if (uuid == battUuid) {
+    } else if (uuid == DIRECT_TEMP_SENSOR_BATT_UUID) {
       _currentTempSensor = _currentTempSensor.copyWith(
         batteryLevel: byteData.getUint32(0, Endian.little).toInt(),
       );
-    } else if (uuid == nameUuid) {
+    } else if (uuid == DIRECT_TEMP_SENSOR_NAME_UUID) {
       print("Raw Name Bytes: $value");
       // Decode and sanitise name (Strict Allow List: Printable ASCII only)
       String raw = utf8.decode(value, allowMalformed: true);
@@ -939,7 +1009,13 @@ class BleService extends ChangeNotifier {
       _currentTempSensor = _currentTempSensor.copyWith(
         name: clean.isNotEmpty ? clean : "AE Temp Sensor",
       );
-    } else if (uuid == Guid("beb5483e-36e1-4688-b7f5-ea07361b26ae")) {
+
+      // Also update SmartShunt model so the Gauge screen shows the name if available
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+        tempSensorName: _currentTempSensor.name,
+      );
+      _smartShuntController.add(_currentSmartShunt);
+    } else if (uuid == DIRECT_TEMP_SENSOR_PAIRED_UUID) {
       _currentTempSensor = _currentTempSensor.copyWith(isPaired: value[0] != 0);
     }
 
@@ -1206,7 +1282,13 @@ class BleService extends ChangeNotifier {
     print('Attempting to reconnect to ${_device!.remoteId}');
 
     // Start scanning
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+    try {
+      await _waitForBluetoothOn();
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+    } catch (e) {
+      print("Error starting scan in reconnect: $e");
+      return;
+    }
 
     // Listen for scan results
     await for (var results in FlutterBluePlus.scanResults) {

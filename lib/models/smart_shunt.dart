@@ -64,6 +64,16 @@ class SmartShunt {
   final double eFuseLimit;
   final int activeShuntRating;
 
+  // New Telemetry
+  final double tempSensorTemperature;
+  final int tempSensorBatteryLevel;
+  final int? tempSensorLastUpdate; // Age in ms (null or 0xFFFFFFFF if never)
+  final String?
+  tempSensorName; // Name of the sensor (from Direct Connection or Relay)
+  final List<double> tpmsPressures; // [FL, FR, RL, RR]
+  final DateTime? gaugeLastRx;
+  final bool gaugeLastTxSuccess;
+
   SmartShunt({
     this.batteryVoltage = 0.0,
     this.batteryCurrent = 0.0,
@@ -92,6 +102,13 @@ class SmartShunt {
     this.ratedCapacity = 0.0,
     this.eFuseLimit = 0.0,
     this.activeShuntRating = 0,
+    this.tempSensorTemperature = 0.0,
+    this.tempSensorBatteryLevel = 0,
+    this.tempSensorLastUpdate,
+    this.tempSensorName,
+    this.tpmsPressures = const [0.0, 0.0, 0.0, 0.0],
+    this.gaugeLastRx,
+    this.gaugeLastTxSuccess = false,
   });
 
   // Add a copyWith method to easily update the state
@@ -123,6 +140,13 @@ class SmartShunt {
     double? ratedCapacity,
     double? eFuseLimit,
     int? activeShuntRating,
+    double? tempSensorTemperature,
+    int? tempSensorBatteryLevel,
+    int? tempSensorLastUpdate,
+    String? tempSensorName,
+    List<double>? tpmsPressures,
+    DateTime? gaugeLastRx,
+    bool? gaugeLastTxSuccess,
   }) {
     return SmartShunt(
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
@@ -154,6 +178,15 @@ class SmartShunt {
       ratedCapacity: ratedCapacity ?? this.ratedCapacity,
       eFuseLimit: eFuseLimit ?? this.eFuseLimit,
       activeShuntRating: activeShuntRating ?? this.activeShuntRating,
+      tempSensorTemperature:
+          tempSensorTemperature ?? this.tempSensorTemperature,
+      tempSensorBatteryLevel:
+          tempSensorBatteryLevel ?? this.tempSensorBatteryLevel,
+      tempSensorLastUpdate: tempSensorLastUpdate ?? this.tempSensorLastUpdate,
+      tempSensorName: tempSensorName ?? this.tempSensorName,
+      tpmsPressures: tpmsPressures ?? this.tpmsPressures,
+      gaugeLastRx: gaugeLastRx ?? this.gaugeLastRx,
+      gaugeLastTxSuccess: gaugeLastTxSuccess ?? this.gaugeLastTxSuccess,
     );
   }
 
@@ -234,3 +267,5 @@ final Guid CRASH_LOG_UUID = Guid("ACDC1234-5678-90AB-CDEF-1234567890CD");
 final Guid RELAY_TEMP_SENSOR_UUID = Guid(
   "ACDC1234-5678-90AB-CDEF-1234567890CE",
 );
+final Guid TPMS_DATA_UUID = Guid("ACDC1234-5678-90AB-CDEF-1234567890CF");
+final Guid GAUGE_STATUS_UUID = Guid("ACDC1234-5678-90AB-CDEF-1234567890D0");
