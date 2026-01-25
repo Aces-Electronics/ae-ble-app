@@ -2,6 +2,7 @@ import 'package:ae_ble_app/models/smart_shunt.dart';
 import 'package:ae_ble_app/models/temp_sensor.dart';
 import 'package:ae_ble_app/screens/ota_update_screen.dart';
 import 'package:ae_ble_app/screens/qr_scan_screen.dart';
+import 'package:ae_ble_app/screens/cloud_settings_screen.dart';
 import 'package:ae_ble_app/services/ble_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -194,47 +195,19 @@ class SettingsScreen extends StatelessWidget {
               ),
               const Divider(),
 
-              // Cloud Gateway
-              SwitchListTile(
-                title: const Text('Enable Cloud Uplink'),
-                subtitle: const Text('Push Data every 15m'),
-                value: smartShunt.cloudEnabled,
-                onChanged: (val) {
-                  bleService.setCloudConfig(val);
-                },
-                secondary: Icon(
-                  Icons.cloud_upload,
-                  color: smartShunt.cloudEnabled ? Colors.blue : Colors.grey,
-                ),
-              ),
+              // Cloud & Network Settings
               ListTile(
-                title: const Text('Last Uplink Status'),
-                subtitle: Text(
-                  smartShunt.cloudStatus == 1
-                      ? "Success"
-                      : smartShunt.cloudStatus == 2
-                          ? "WiFi Connection Failed"
-                          : smartShunt.cloudStatus == 3
-                              ? "MQTT Broker Failed"
-                              : "Pending / Never",
-                ),
-                leading: Icon(
-                  smartShunt.cloudStatus == 1
-                      ? Icons.check_circle
-                      : smartShunt.cloudStatus == 0
-                          ? Icons.cloud_off
-                          : Icons.error,
-                  color: smartShunt.cloudStatus == 1
-                      ? Colors.green
-                      : smartShunt.cloudStatus == 0
-                          ? Colors.grey
-                          : Colors.red,
-                ),
-                trailing: Text(
-                   smartShunt.cloudLastSuccessTime > 0 
-                     ? "${(smartShunt.cloudLastSuccessTime / 60).toStringAsFixed(0)}m ago" 
-                     : "--",
-                ),
+                title: const Text('Cloud & Network Settings'),
+                subtitle: const Text('WiFi, MQTT & Uplink Control'),
+                leading: const Icon(Icons.cloud),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const CloudSettingsScreen(),
+                    ),
+                  );
+                },
               ),
               const Divider(),
 

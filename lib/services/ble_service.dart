@@ -59,6 +59,9 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _crashLogCharacteristic;
   BluetoothCharacteristic? _cloudConfigCharacteristic;
   BluetoothCharacteristic? _cloudStatusCharacteristic;
+  BluetoothCharacteristic? _mqttBrokerCharacteristic;
+  BluetoothCharacteristic? _mqttUserCharacteristic;
+  BluetoothCharacteristic? _mqttPassCharacteristic;
 
   // Temp Sensor Specific
   BluetoothCharacteristic? _tempSensorPairedCharacteristic;
@@ -171,6 +174,9 @@ class BleService extends ChangeNotifier {
       _efuseLimitCharacteristic = null;
       _cloudConfigCharacteristic = null;
       _cloudStatusCharacteristic = null;
+      _mqttBrokerCharacteristic = null;
+      _mqttUserCharacteristic = null;
+      _mqttPassCharacteristic = null;
 
       // Reset state to empty/loading to prevent stale data on next connect
       _currentSmartShunt = SmartShunt();
@@ -415,6 +421,12 @@ class BleService extends ChangeNotifier {
             _cloudConfigCharacteristic = characteristic;
           } else if (characteristic.uuid == CLOUD_STATUS_UUID) {
             _cloudStatusCharacteristic = characteristic;
+          } else if (characteristic.uuid == MQTT_BROKER_CHAR_UUID) {
+            _mqttBrokerCharacteristic = characteristic;
+          } else if (characteristic.uuid == MQTT_USER_CHAR_UUID) {
+            _mqttUserCharacteristic = characteristic;
+          } else if (characteristic.uuid == MQTT_PASS_CHAR_UUID) {
+            _mqttPassCharacteristic = characteristic;
           }
         }
       }
@@ -557,6 +569,27 @@ class BleService extends ChangeNotifier {
     // Optimistic Update
     _currentSmartShunt = _currentSmartShunt.copyWith(cloudEnabled: enabled);
     _smartShuntController.add(_currentSmartShunt);
+  }
+
+  Future<void> setMqttBroker(String broker) async {
+    await _safeWrite(
+      _mqttBrokerCharacteristic,
+      utf8.encode(broker),
+      "MQTT Broker",
+    );
+  }
+
+  Future<void> setMqttAuth(String user, String pass) async {
+     await _safeWrite(
+      _mqttUserCharacteristic,
+      utf8.encode(user),
+      "MQTT User",
+    );
+    await _safeWrite(
+      _mqttPassCharacteristic,
+      utf8.encode(pass),
+      "MQTT Pass",
+    );
   }
 
   Future<double?> readEfuseLimit() async {
