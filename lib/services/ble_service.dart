@@ -351,17 +351,13 @@ class BleService extends ChangeNotifier {
               characteristic.uuid == DEVICE_NAME_SUFFIX_UUID ||
               characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID ||
               characteristic.uuid == DIAGNOSTICS_UUID ||
-              characteristic.uuid == DEVICE_NAME_SUFFIX_UUID ||
-              characteristic.uuid == SET_VOLTAGE_PROTECTION_UUID ||
-              characteristic.uuid == DIAGNOSTICS_UUID ||
               characteristic.uuid == RELAY_TEMP_SENSOR_UUID ||
               characteristic.uuid == TPMS_DATA_UUID ||
-              characteristic.uuid == TPMS_DATA_UUID ||
               characteristic.uuid == GAUGE_STATUS_UUID ||
+              characteristic.uuid == PRESSURE_DATA_UUID ||
               characteristic.uuid == DIRECT_TEMP_SENSOR_DATA_UUID ||
               characteristic.uuid == DIRECT_TEMP_SENSOR_SLEEP_UUID ||
               characteristic.uuid == DIRECT_TEMP_SENSOR_BATT_UUID ||
-              characteristic.uuid == DIRECT_TEMP_SENSOR_NAME_UUID ||
               characteristic.uuid == DIRECT_TEMP_SENSOR_NAME_UUID ||
               characteristic.uuid == DIRECT_TEMP_SENSOR_PAIRED_UUID ||
               characteristic.uuid == CLOUD_CONFIG_UUID ||
