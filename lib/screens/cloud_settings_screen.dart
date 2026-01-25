@@ -144,7 +144,7 @@ class _CloudSettingsScreenState extends State<CloudSettingsScreen> {
                             controller: _brokerController,
                             decoration: const InputDecoration(
                               labelText: 'Broker Address',
-                              hintText: 'Default: 192.168.1.100',
+                              hintText: 'Default: 155.138.198.158',
                               border: OutlineInputBorder(),
                             ),
                           ),
