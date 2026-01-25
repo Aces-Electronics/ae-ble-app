@@ -363,7 +363,8 @@ class BleService extends ChangeNotifier {
               characteristic.uuid == CLOUD_CONFIG_UUID ||
               characteristic.uuid == CLOUD_STATUS_UUID ||
               characteristic.uuid == WIFI_SSID_CHAR_UUID ||
-              characteristic.uuid == MQTT_BROKER_CHAR_UUID) {
+              characteristic.uuid == MQTT_BROKER_CHAR_UUID ||
+              characteristic.uuid == MQTT_USER_CHAR_UUID) {
             try {
               if (characteristic.uuid == ERROR_STATE_UUID) {
                 final val = await characteristic.read();
@@ -854,6 +855,10 @@ class BleService extends ChangeNotifier {
       String broker = utf8.decode(value);
       _currentSmartShunt = _currentSmartShunt.copyWith(mqttBroker: broker);
       print("Parsed MQTT Broker: $broker");
+    } else if (characteristicUuid == MQTT_USER_CHAR_UUID) {
+      String user = utf8.decode(value);
+      _currentSmartShunt = _currentSmartShunt.copyWith(mqttUser: user);
+      print("Parsed MQTT User: $user");
     } else if (characteristicUuid == WIFI_SSID_CHAR_UUID) {
       String ssid = utf8.decode(value);
       _currentSmartShunt = _currentSmartShunt.copyWith(wifiSsid: ssid);

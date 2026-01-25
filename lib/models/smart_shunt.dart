@@ -79,6 +79,7 @@ class SmartShunt {
   final int cloudStatus; // 0=None, 1=Success, 2=WifiFail, 3=MqttFail
   final int cloudLastSuccessTime; // Seconds since success
   final String mqttBroker;
+  final String mqttUser;
   final String wifiSsid;
 
   SmartShunt({
@@ -120,6 +121,7 @@ class SmartShunt {
     this.cloudStatus = 0,
     this.cloudLastSuccessTime = 0,
     this.mqttBroker = "",
+    this.mqttUser = "",
     this.wifiSsid = "",
   });
 
@@ -164,6 +166,7 @@ class SmartShunt {
     int? cloudStatus,
     int? cloudLastSuccessTime,
     String? mqttBroker,
+    String? mqttUser,
     String? wifiSsid,
   }) {
     return SmartShunt(
@@ -208,6 +211,9 @@ class SmartShunt {
       cloudEnabled: cloudEnabled ?? this.cloudEnabled,
       cloudStatus: cloudStatus ?? this.cloudStatus,
       cloudLastSuccessTime: cloudLastSuccessTime ?? this.cloudLastSuccessTime,
+      mqttBroker: mqttBroker ?? this.mqttBroker,
+      mqttUser: mqttUser ?? this.mqttUser,
+      wifiSsid: wifiSsid ?? this.wifiSsid,
     );
   }
 
