@@ -57,6 +57,8 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _pairingCharacteristic;
   BluetoothCharacteristic? _efuseLimitCharacteristic;
   BluetoothCharacteristic? _crashLogCharacteristic;
+  BluetoothCharacteristic? _cloudConfigCharacteristic;
+  BluetoothCharacteristic? _cloudStatusCharacteristic;
 
   // Temp Sensor Specific
   BluetoothCharacteristic? _tempSensorPairedCharacteristic;
@@ -165,7 +167,10 @@ class BleService extends ChangeNotifier {
       // _progressCharacteristic = null;
       _setRatedCapacityCharacteristic = null;
       _pairingCharacteristic = null;
+      _pairingCharacteristic = null;
       _efuseLimitCharacteristic = null;
+      _cloudConfigCharacteristic = null;
+      _cloudStatusCharacteristic = null;
 
       // Reset state to empty/loading to prevent stale data on next connect
       _currentSmartShunt = SmartShunt();
@@ -351,7 +356,10 @@ class BleService extends ChangeNotifier {
               characteristic.uuid == DIRECT_TEMP_SENSOR_SLEEP_UUID ||
               characteristic.uuid == DIRECT_TEMP_SENSOR_BATT_UUID ||
               characteristic.uuid == DIRECT_TEMP_SENSOR_NAME_UUID ||
-              characteristic.uuid == DIRECT_TEMP_SENSOR_PAIRED_UUID) {
+              characteristic.uuid == DIRECT_TEMP_SENSOR_NAME_UUID ||
+              characteristic.uuid == DIRECT_TEMP_SENSOR_PAIRED_UUID ||
+              characteristic.uuid == CLOUD_CONFIG_UUID ||
+              characteristic.uuid == CLOUD_STATUS_UUID) {
             try {
               if (characteristic.uuid == ERROR_STATE_UUID) {
                 final val = await characteristic.read();
@@ -403,6 +411,10 @@ class BleService extends ChangeNotifier {
             );
           } else if (characteristic.uuid == EFUSE_LIMIT_UUID) {
             _efuseLimitCharacteristic = characteristic;
+          } else if (characteristic.uuid == CLOUD_CONFIG_UUID) {
+            _cloudConfigCharacteristic = characteristic;
+          } else if (characteristic.uuid == CLOUD_STATUS_UUID) {
+            _cloudStatusCharacteristic = characteristic;
           }
         }
       }
@@ -534,6 +546,17 @@ class BleService extends ChangeNotifier {
       EFUSE_LIMIT_UUID,
       byteData.buffer.asUint8List(),
     );
+  }
+
+  Future<void> setCloudConfig(bool enabled) async {
+    await _safeWrite(
+      _cloudConfigCharacteristic,
+      [enabled ? 1 : 0],
+      "Cloud Config",
+    );
+    // Optimistic Update
+    _currentSmartShunt = _currentSmartShunt.copyWith(cloudEnabled: enabled);
+    _smartShuntController.add(_currentSmartShunt);
   }
 
   Future<double?> readEfuseLimit() async {
@@ -800,7 +823,22 @@ class BleService extends ChangeNotifier {
       _currentSmartShunt = _currentSmartShunt.copyWith(
         loadState: value[0] == 1,
       );
-    } else if (characteristicUuid == SET_VOLTAGE_PROTECTION_UUID) {
+    } else if (characteristicUuid == CLOUD_CONFIG_UUID) {
+      _currentSmartShunt = _currentSmartShunt.copyWith(
+        cloudEnabled: value[0] == 1,
+      );
+    } else if (characteristicUuid == CLOUD_STATUS_UUID) {
+      // Format: [Status(1)][Time(4)]
+      if (value.length >= 5) {
+        ByteData bd = ByteData.sublistView(Uint8List.fromList(value));
+        int status = value[0];
+        int time = bd.getUint32(1, Endian.little);
+        _currentSmartShunt = _currentSmartShunt.copyWith(
+          cloudStatus: status,
+          cloudLastSuccessTime: time,
+        );
+      }
+    } else if (characteristicUuid == LOAD_CONTROL_UUID) {
       try {
         // The device sends a C-style string (null-terminated). Find the first null byte.
         final nullTerminatorIndex = value.indexOf(0);

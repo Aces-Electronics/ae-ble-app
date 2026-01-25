@@ -73,6 +73,11 @@ class SmartShunt {
   final List<double> tpmsPressures; // [FL, FR, RL, RR]
   final DateTime? gaugeLastRx;
   final bool gaugeLastTxSuccess;
+  
+  // Cloud
+  final bool cloudEnabled;
+  final int cloudStatus; // 0=None, 1=Success, 2=WifiFail, 3=MqttFail
+  final int cloudLastSuccessTime; // Seconds since success
 
   SmartShunt({
     this.batteryVoltage = 0.0,
@@ -109,6 +114,9 @@ class SmartShunt {
     this.tpmsPressures = const [0.0, 0.0, 0.0, 0.0],
     this.gaugeLastRx,
     this.gaugeLastTxSuccess = false,
+    this.cloudEnabled = false,
+    this.cloudStatus = 0,
+    this.cloudLastSuccessTime = 0,
   });
 
   // Add a copyWith method to easily update the state
@@ -147,6 +155,9 @@ class SmartShunt {
     List<double>? tpmsPressures,
     DateTime? gaugeLastRx,
     bool? gaugeLastTxSuccess,
+    bool? cloudEnabled,
+    int? cloudStatus,
+    int? cloudLastSuccessTime,
   }) {
     return SmartShunt(
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
@@ -187,6 +198,9 @@ class SmartShunt {
       tpmsPressures: tpmsPressures ?? this.tpmsPressures,
       gaugeLastRx: gaugeLastRx ?? this.gaugeLastRx,
       gaugeLastTxSuccess: gaugeLastTxSuccess ?? this.gaugeLastTxSuccess,
+      cloudEnabled: cloudEnabled ?? this.cloudEnabled,
+      cloudStatus: cloudStatus ?? this.cloudStatus,
+      cloudLastSuccessTime: cloudLastSuccessTime ?? this.cloudLastSuccessTime,
     );
   }
 
@@ -269,3 +283,5 @@ final Guid RELAY_TEMP_SENSOR_UUID = Guid(
 );
 final Guid TPMS_DATA_UUID = Guid("ACDC1234-5678-90AB-CDEF-1234567890CF");
 final Guid GAUGE_STATUS_UUID = Guid("ACDC1234-5678-90AB-CDEF-1234567890D0");
+final Guid CLOUD_CONFIG_UUID = Guid("6a89b148-b4e8-43d7-952b-a0b4b01e43b3");
+final Guid CLOUD_STATUS_UUID = Guid("7a89b148-b4e8-43d7-952b-a0b4b01e43b3");
