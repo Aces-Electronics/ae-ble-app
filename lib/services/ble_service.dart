@@ -473,6 +473,9 @@ class BleService extends ChangeNotifier {
       utf8.encode(password),
       "WiFi Password",
     );
+    // Optimistic Update
+    _currentSmartShunt = _currentSmartShunt.copyWith(wifiSsid: ssid);
+    _smartShuntController.add(_currentSmartShunt);
   }
 
   Future<void> setLoadState(bool enabled) async {
@@ -575,6 +578,8 @@ class BleService extends ChangeNotifier {
       utf8.encode(broker),
       "MQTT Broker",
     );
+    _currentSmartShunt = _currentSmartShunt.copyWith(mqttBroker: broker);
+    _smartShuntController.add(_currentSmartShunt);
   }
 
   Future<void> setMqttAuth(String user, String pass) async {
