@@ -354,7 +354,7 @@ class BleService extends ChangeNotifier {
               characteristic.uuid == RELAY_TEMP_SENSOR_UUID ||
               characteristic.uuid == TPMS_DATA_UUID ||
               characteristic.uuid == GAUGE_STATUS_UUID ||
-              characteristic.uuid == PRESSURE_DATA_UUID ||
+              characteristic.uuid == TPMS_DATA_UUID ||
               characteristic.uuid == DIRECT_TEMP_SENSOR_DATA_UUID ||
               characteristic.uuid == DIRECT_TEMP_SENSOR_SLEEP_UUID ||
               characteristic.uuid == DIRECT_TEMP_SENSOR_BATT_UUID ||

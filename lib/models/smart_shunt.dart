@@ -78,6 +78,8 @@ class SmartShunt {
   final bool cloudEnabled;
   final int cloudStatus; // 0=None, 1=Success, 2=WifiFail, 3=MqttFail
   final int cloudLastSuccessTime; // Seconds since success
+  final String mqttBroker;
+  final String wifiSsid;
 
   SmartShunt({
     this.batteryVoltage = 0.0,
@@ -117,6 +119,8 @@ class SmartShunt {
     this.cloudEnabled = false,
     this.cloudStatus = 0,
     this.cloudLastSuccessTime = 0,
+    this.mqttBroker = "",
+    this.wifiSsid = "",
   });
 
   // Add a copyWith method to easily update the state
@@ -152,8 +156,9 @@ class SmartShunt {
     int? tempSensorBatteryLevel,
     int? tempSensorLastUpdate,
     int? tempSensorUpdateInterval,
-    List<double>? tpmsPressurePsi,
-    int? gaugeLastRx,
+    String? tempSensorName,
+    List<double>? tpmsPressures,
+    DateTime? gaugeLastRx,
     bool? gaugeLastTxSuccess,
     bool? cloudEnabled,
     int? cloudStatus,
@@ -165,8 +170,8 @@ class SmartShunt {
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
       batteryCurrent: batteryCurrent ?? this.batteryCurrent,
       batteryPower: batteryPower ?? this.batteryPower,
-      batterySOC: batterySOC ?? this.batterySOC,
-      batteryCapacity: batteryCapacity ?? this.batteryCapacity,
+      soc: soc ?? this.soc,
+      remainingCapacity: remainingCapacity ?? this.remainingCapacity,
       starterBatteryVoltage:
           starterBatteryVoltage ?? this.starterBatteryVoltage,
       isCalibrated: isCalibrated ?? this.isCalibrated,
