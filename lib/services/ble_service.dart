@@ -364,7 +364,8 @@ class BleService extends ChangeNotifier {
               characteristic.uuid == CLOUD_STATUS_UUID ||
               characteristic.uuid == WIFI_SSID_CHAR_UUID ||
               characteristic.uuid == MQTT_BROKER_CHAR_UUID ||
-              characteristic.uuid == MQTT_USER_CHAR_UUID) {
+              characteristic.uuid == MQTT_USER_CHAR_UUID ||
+              characteristic.uuid == PAIRING_CHAR_UUID) {
             try {
               if (characteristic.uuid == ERROR_STATE_UUID) {
                 final val = await characteristic.read();
@@ -859,6 +860,19 @@ class BleService extends ChangeNotifier {
       String user = utf8.decode(value);
       _currentSmartShunt = _currentSmartShunt.copyWith(mqttUser: user);
       print("Parsed MQTT User: $user");
+    } else if (characteristicUuid == PAIRING_CHAR_UUID) {
+      // Decode ESP-NOW MAC
+      try {
+        String mac = utf8.decode(value);
+        mac = mac.replaceAll(RegExp(r'[^0-9A-Fa-f:]'), '');
+        _currentSmartShunt = _currentSmartShunt.copyWith(espNowMac: mac);
+        print("Parsed ESP-NOW MAC: $mac");
+      } catch (e) {
+        // Hex fallback
+       String hex = value.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(':');
+       _currentSmartShunt = _currentSmartShunt.copyWith(espNowMac: hex);
+       print("Parsed ESP-NOW MAC (Hex): $hex");
+      }
     } else if (characteristicUuid == WIFI_SSID_CHAR_UUID) {
       String ssid = utf8.decode(value);
       _currentSmartShunt = _currentSmartShunt.copyWith(wifiSsid: ssid);

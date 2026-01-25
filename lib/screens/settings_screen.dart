@@ -183,15 +183,14 @@ class SettingsScreen extends StatelessWidget {
           return ListView(
             children: [
               // 1. ESP-NOW MAC
-              FutureBuilder<String?>(
-                future: bleService.readEspNowMac(),
-                builder: (context, snapshot) {
-                  return ListTile(
-                    title: const Text('ESP-NOW MAC'),
-                    subtitle: Text(snapshot.data ?? "Loading..."),
-                    leading: const Icon(Icons.wifi),
-                  );
-                },
+              ListTile(
+                title: const Text('ESP-NOW MAC'),
+                subtitle: Text(
+                  smartShunt.espNowMac.isNotEmpty
+                      ? smartShunt.espNowMac
+                      : "Loading...",
+                ),
+                leading: const Icon(Icons.wifi),
               ),
               const Divider(),
 

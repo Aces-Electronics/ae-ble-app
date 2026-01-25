@@ -81,6 +81,7 @@ class SmartShunt {
   final String mqttBroker;
   final String mqttUser;
   final String wifiSsid;
+  final String espNowMac;
 
   SmartShunt({
     this.batteryVoltage = 0.0,
@@ -123,6 +124,7 @@ class SmartShunt {
     this.mqttBroker = "",
     this.mqttUser = "",
     this.wifiSsid = "",
+    this.espNowMac = "",
   });
 
   // Add a copyWith method to easily update the state
@@ -168,6 +170,7 @@ class SmartShunt {
     String? mqttBroker,
     String? mqttUser,
     String? wifiSsid,
+    String? espNowMac,
   }) {
     return SmartShunt(
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
@@ -214,6 +217,7 @@ class SmartShunt {
       mqttBroker: mqttBroker ?? this.mqttBroker,
       mqttUser: mqttUser ?? this.mqttUser,
       wifiSsid: wifiSsid ?? this.wifiSsid,
+      espNowMac: espNowMac ?? this.espNowMac,
     );
   }
 
