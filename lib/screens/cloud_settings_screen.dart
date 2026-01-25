@@ -32,6 +32,9 @@ class _CloudSettingsScreenState extends State<CloudSettingsScreen> {
       if (shunt.wifiSsid.isNotEmpty) {
         _ssidController.text = shunt.wifiSsid;
       }
+      if (shunt.mqttUser.isNotEmpty) {
+        _mqttUserController.text = shunt.mqttUser;
+      }
     });
   }
 
