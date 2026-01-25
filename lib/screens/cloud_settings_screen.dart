@@ -17,6 +17,9 @@ class _CloudSettingsScreenState extends State<CloudSettingsScreen> {
   final TextEditingController _mqttUserController = TextEditingController();
   final TextEditingController _mqttPassController = TextEditingController();
 
+  bool _isEditingWifi = false;
+  bool _isEditingMqtt = false;
+
   @override
   void initState() {
     super.initState();
@@ -100,42 +103,80 @@ class _CloudSettingsScreenState extends State<CloudSettingsScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      TextField(
-                        controller: _ssidController,
-                        decoration: const InputDecoration(
-                          labelText: 'SSID (Network Name)',
-                          border: OutlineInputBorder(),
+                      
+                      if (!_isEditingWifi) ...[
+                        // View Mode
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text("Current Network"),
+                          subtitle: Text(shunt.wifiSsid.isNotEmpty ? shunt.wifiSsid : "Not Configured / Unknown"),
+                          leading: Icon(shunt.wifiSsid.isNotEmpty ? Icons.wifi : Icons.wifi_off, 
+                              color: shunt.wifiSsid.isNotEmpty ? Colors.blue : Colors.grey),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _passController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          border: OutlineInputBorder(),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setState(() {
+                                _isEditingWifi = true;
+                                _ssidController.text = shunt.wifiSsid; // Pre-fill
+                              });
+                            },
+                            child: const Text("Change WiFi Settings"),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            if (_ssidController.text.isNotEmpty) {
-                              await bleService.setWifiCredentials(
-                                _ssidController.text,
-                                _passController.text
-                              );
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("WiFi Credentials Sent. Device may reconnect."))
-                                );
-                              }
-                            }
-                          },
-                          child: const Text("Save WiFi Settings"),
+                      ] else ...[
+                        // Edit Mode
+                        TextField(
+                          controller: _ssidController,
+                          decoration: const InputDecoration(
+                            labelText: 'SSID (Network Name)',
+                            border: OutlineInputBorder(),
+                            helperText: "Enter 2.4GHz WiFi Name",
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _passController,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Password',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                             Expanded(
+                               child: OutlinedButton(
+                                 onPressed: () => setState(() => _isEditingWifi = false),
+                                 child: const Text("Cancel"),
+                               ),
+                             ),
+                             const SizedBox(width: 16),
+                             Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  if (_ssidController.text.isNotEmpty) {
+                                    await bleService.setWifiCredentials(
+                                      _ssidController.text,
+                                      _passController.text
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text("WiFi Credentials Sent."))
+                                      );
+                                      setState(() => _isEditingWifi = false);
+                                    }
+                                  }
+                                },
+                                child: const Text("Save"),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -153,58 +194,93 @@ class _CloudSettingsScreenState extends State<CloudSettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("MQTT Broker Configuration", style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _brokerController,
-                            decoration: const InputDecoration(
-                              labelText: 'Broker Address',
-                              hintText: 'Default: 155.138.198.158',
-                              border: OutlineInputBorder(),
+                          if (!_isEditingMqtt) ...[
+                             // View Mode
+                             const Text("MQTT Broker", style: TextStyle(fontWeight: FontWeight.bold)),
+                             Text(shunt.mqttBroker.isNotEmpty ? shunt.mqttBroker : "Default (155.138.198.158)", style: const TextStyle(fontSize: 16)),
+                             const SizedBox(height: 16),
+                             const Text("Authentication", style: TextStyle(fontWeight: FontWeight.bold)),
+                             const Text("********", style: TextStyle(fontSize: 16, fontFamily: 'monospace')), 
+                             const SizedBox(height: 16),
+                             
+                             SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isEditingMqtt = true;
+                                      if (shunt.mqttBroker.isNotEmpty) _brokerController.text = shunt.mqttBroker;
+                                    });
+                                  },
+                                  child: const Text("Edit Advanced Settings"),
+                                ),
+                              ),
+                          ] else ...[
+                             // Edit Mode
+                            const Text("MQTT Broker Configuration", style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _brokerController,
+                              decoration: const InputDecoration(
+                                labelText: 'Broker Address',
+                                hintText: 'Default: 155.138.198.158',
+                                border: OutlineInputBorder(),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          const Text("Authentication", style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _mqttUserController,
-                            decoration: const InputDecoration(
-                              labelText: 'MQTT Username',
-                              border: OutlineInputBorder(),
+                            const SizedBox(height: 16),
+                            
+                            const Text("Authentication", style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _mqttUserController,
+                              decoration: const InputDecoration(
+                                labelText: 'MQTT Username',
+                                border: OutlineInputBorder(),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _mqttPassController,
-                            obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'MQTT Password',
-                              border: OutlineInputBorder(),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _mqttPassController,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'MQTT Password',
+                                border: OutlineInputBorder(),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade100),
-                              onPressed: () async {
-                                if (_brokerController.text.isNotEmpty) {
-                                  await bleService.setMqttBroker(_brokerController.text);
-                                }
-                                if (_mqttUserController.text.isNotEmpty && _mqttPassController.text.isNotEmpty) {
-                                  await bleService.setMqttAuth(_mqttUserController.text, _mqttPassController.text);
-                                }
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Advanced Settings Updated. Reboot Required."))
-                                  );
-                                }
-                              },
-                              child: const Text("Save Advanced Settings", style: TextStyle(color: Colors.brown)),
+                            const SizedBox(height: 16),
+                            
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () => setState(() => _isEditingMqtt = false),
+                                    child: const Text("Cancel"),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade100),
+                                    onPressed: () async {
+                                      if (_brokerController.text.isNotEmpty) {
+                                        await bleService.setMqttBroker(_brokerController.text);
+                                      }
+                                      if (_mqttUserController.text.isNotEmpty && _mqttPassController.text.isNotEmpty) {
+                                        await bleService.setMqttAuth(_mqttUserController.text, _mqttPassController.text);
+                                      }
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text("Advanced Settings Updated. Reboot Required."))
+                                        );
+                                        setState(() => _isEditingMqtt = false);
+                                      }
+                                    },
+                                    child: const Text("Save", style: TextStyle(color: Colors.brown)),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
