@@ -18,6 +18,21 @@ class _CloudSettingsScreenState extends State<CloudSettingsScreen> {
   final TextEditingController _mqttPassController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final bleService = Provider.of<BleService>(context, listen: false);
+      final shunt = bleService.currentSmartShunt;
+      if (shunt.mqttBroker.isNotEmpty) {
+        _brokerController.text = shunt.mqttBroker;
+      }
+      if (shunt.wifiSsid.isNotEmpty) {
+        _ssidController.text = shunt.wifiSsid;
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _ssidController.dispose();
     _passController.dispose();

@@ -361,7 +361,9 @@ class BleService extends ChangeNotifier {
               characteristic.uuid == DIRECT_TEMP_SENSOR_NAME_UUID ||
               characteristic.uuid == DIRECT_TEMP_SENSOR_PAIRED_UUID ||
               characteristic.uuid == CLOUD_CONFIG_UUID ||
-              characteristic.uuid == CLOUD_STATUS_UUID) {
+              characteristic.uuid == CLOUD_STATUS_UUID ||
+              characteristic.uuid == WIFI_SSID_CHAR_UUID ||
+              characteristic.uuid == MQTT_BROKER_CHAR_UUID) {
             try {
               if (characteristic.uuid == ERROR_STATE_UUID) {
                 final val = await characteristic.read();
@@ -832,6 +834,25 @@ class BleService extends ChangeNotifier {
         soc *= 100;
       }
       _currentSmartShunt = _currentSmartShunt.copyWith(soc: soc);
+    } else if (characteristicUuid == CLOUD_STATUS_UUID) {
+      // Format: [Status(1)][Time(4)]
+      if (value.length >= 5) {
+        ByteData bd = ByteData.sublistView(Uint8List.fromList(value));
+        int status = value[0];
+        int time = bd.getUint32(1, Endian.little);
+        _currentSmartShunt = _currentSmartShunt.copyWith(
+          cloudStatus: status,
+          cloudLastSuccessTime: time,
+        );
+      }
+    } else if (characteristicUuid == MQTT_BROKER_CHAR_UUID) {
+      String broker = utf8.decode(value);
+      _currentSmartShunt = _currentSmartShunt.copyWith(mqttBroker: broker);
+      print("Parsed MQTT Broker: $broker");
+    } else if (characteristicUuid == WIFI_SSID_CHAR_UUID) {
+      String ssid = utf8.decode(value);
+      _currentSmartShunt = _currentSmartShunt.copyWith(wifiSsid: ssid);
+      print("Parsed WiFi SSID: $ssid");
     } else if (characteristicUuid == REMAINING_CAPACITY_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
         remainingCapacity: byteData.getFloat32(0, Endian.little),
