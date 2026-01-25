@@ -5,6 +5,7 @@ import 'package:ae_ble_app/screens/qr_scan_screen.dart';
 import 'package:ae_ble_app/services/ble_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -220,6 +221,30 @@ class SettingsScreen extends StatelessWidget {
                             child: Text(log ?? "No Log Data Returns"),
                           ),
                           actions: [
+                            TextButton(
+                              onPressed: () async {
+                                final Uri emailLaunchUri = Uri(
+                                  scheme: 'mailto',
+                                  path: 'ace@aceselectronics.com.au',
+                                  query:
+                                      'subject=Crash Log&body=${Uri.encodeComponent(log ?? "No Log Data")}',
+                                );
+                                if (await canLaunchUrl(emailLaunchUri)) {
+                                  await launchUrl(emailLaunchUri);
+                                } else {
+                                  if (ctx.mounted) {
+                                    ScaffoldMessenger.of(ctx).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Could not launch email client',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              child: const Text("Send to Support"),
+                            ),
                             TextButton(
                               onPressed: () => Navigator.pop(ctx),
                               child: const Text("Close"),
