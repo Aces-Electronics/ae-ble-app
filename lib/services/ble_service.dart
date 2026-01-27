@@ -913,28 +913,10 @@ class BleService extends ChangeNotifier {
         );
       }
     } else if (characteristicUuid == LOAD_CONTROL_UUID) {
-      try {
-        // The device sends a C-style string (null-terminated). Find the first null byte.
-        final nullTerminatorIndex = value.indexOf(0);
-        // Take the sublist up to the null terminator, or the full list if not found.
-        final actualValue = nullTerminatorIndex != -1
-            ? value.sublist(0, nullTerminatorIndex)
-            : value;
-
-        final valueString = utf8.decode(actualValue).trim();
-        final parts = valueString.split(',');
-        if (parts.length == 2) {
-          final cutoff = double.tryParse(parts[0]);
-          final reconnect = double.tryParse(parts[1]);
-          if (cutoff != null && reconnect != null) {
-            _currentSmartShunt = _currentSmartShunt.copyWith(
-              cutoffVoltage: cutoff,
-              reconnectVoltage: reconnect,
-            );
-          }
-        }
-      } catch (e) {
-        // Gracefully handle the error to prevent a crash
+      if(value.isNotEmpty) {
+           _currentSmartShunt = _currentSmartShunt.copyWith(
+             loadState: value[0] != 0,
+           );
       }
     } else if (characteristicUuid == LAST_HOUR_WH_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
@@ -994,6 +976,31 @@ class BleService extends ChangeNotifier {
       }
       if (value.isNotEmpty) {
         _currentSmartShunt = _currentSmartShunt.copyWith(otaProgress: value[0]);
+      }
+    } else if (characteristicUuid == SET_VOLTAGE_PROTECTION_UUID) {
+       try {
+        // The device sends a C-style string (null-terminated). Find the first null byte.
+        final nullTerminatorIndex = value.indexOf(0);
+        // Take the sublist up to the null terminator, or the full list if not found.
+        final actualValue = nullTerminatorIndex != -1
+            ? value.sublist(0, nullTerminatorIndex)
+            : value;
+
+        final valueString = utf8.decode(actualValue).trim();
+        final parts = valueString.split(',');
+        if (parts.length == 2) {
+          final cutoff = double.tryParse(parts[0]);
+          final reconnect = double.tryParse(parts[1]);
+          if (cutoff != null && reconnect != null) {
+            _currentSmartShunt = _currentSmartShunt.copyWith(
+              cutoffVoltage: cutoff,
+              reconnectVoltage: reconnect,
+            );
+          }
+        }
+      } catch (e) {
+        // Gracefully handle the error
+        print("Error parsing Voltage Protection: $e");
       }
     } else if (characteristicUuid == SET_RATED_CAPACITY_CHAR_UUID) {
       _currentSmartShunt = _currentSmartShunt.copyWith(
