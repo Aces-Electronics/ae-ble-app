@@ -778,6 +778,42 @@ class BleService extends ChangeNotifier {
     ], "Start OTA Update"); // 1 = true
   }
 
+  Future<void> forceMqttPush() async {
+    print("Forcing MQTT Push via BLE...");
+    await _safeWrite(
+      _pairingCharacteristic,
+      utf8.encode("FORCE_MQTT"),
+      "Force MQTT Push",
+    );
+  }
+
+  Future<void> forceFirmwareUpdate() async {
+    print("Forcing Firmware Update via BLE...");
+    await _safeWrite(
+      _pairingCharacteristic,
+      utf8.encode("FORCE_OTA"),
+      "Force Firmware Update",
+    );
+  }
+
+  Future<void> forceOtaGauge() async {
+    print("Forcing Gauge OTA via BLE...");
+    await _safeWrite(
+      _pairingCharacteristic,
+      utf8.encode("FORCE_OTA_GAUGE"),
+      "Force Gauge OTA",
+    );
+  }
+
+  Future<void> forceOtaTemp() async {
+    print("Forcing Temp Sensor OTA via BLE...");
+    await _safeWrite(
+      _pairingCharacteristic,
+      utf8.encode("FORCE_OTA_TEMP"),
+      "Force Temp Sensor OTA",
+    );
+  }
+
   Future<void> _updateSmartShuntData(
     Guid characteristicUuid,
     List<int> value,

@@ -219,9 +219,25 @@ class SettingsScreen extends StatelessWidget {
                       : "Waiting for update...",
                 ),
                 leading: const Icon(Icons.info_outline),
-                trailing: TextButton(
-                  child: const Text("View Log"),
-                  onPressed: () async {
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(
+                      child: const Text("Force MQTT"),
+                      onPressed: () async {
+                        await bleService.forceMqttPush();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("MQTT Uplink Triggered"),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    TextButton(
+                      child: const Text("View Log"),
+                      onPressed: () async {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text("Fetching Crash Log...")),
                     );
@@ -337,6 +353,41 @@ class SettingsScreen extends StatelessWidget {
                 },
               ),
 
+              const Divider(),
+
+              // Force Relay OTA (Debug)
+              ListTile(
+                title: const Text('Force Relay OTA'),
+                subtitle: const Text('Trigger OTA on Paired Devices'),
+                leading: const Icon(Icons.cast_connected),
+                trailing: Row(
+                   mainAxisSize: MainAxisSize.min,
+                   children: [
+                      TextButton(
+                        child: const Text("Gauge"),
+                        onPressed: () async {
+                           await bleService.forceOtaGauge();
+                           if (context.mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(
+                               const SnackBar(content: Text("Sent OTA Trigger to Gauge")),
+                             );
+                           }
+                        }
+                      ),
+                      TextButton(
+                        child: const Text("Temp"),
+                         onPressed: () async {
+                           await bleService.forceOtaTemp();
+                           if (context.mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(
+                               const SnackBar(content: Text("Sent OTA Trigger to Temp Sensor")),
+                             );
+                           }
+                        }
+                      ),
+                   ]
+                ),
+              ),
               const Divider(),
 
               // 5. Firmware Update

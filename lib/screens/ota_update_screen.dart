@@ -223,6 +223,22 @@ class _OtaUpdateScreenState extends State<OtaUpdateScreen> {
           onPressed: _checkForUpdate,
           child: const Text('Check for Updates'),
         ),
+        const SizedBox(height: 16),
+        TextButton(
+          onPressed: () async {
+            await _bleService.setWifiCredentials(
+              _ssidController.text,
+              _passwordController.text,
+            );
+            await Future.delayed(const Duration(milliseconds: 200));
+            await _bleService.forceFirmwareUpdate();
+            _startUpdate(); // Trigger progress UI and reconnection logic
+          },
+          child: const Text(
+            'Force Update (Ignore Version)',
+            style: TextStyle(color: Colors.redAccent),
+          ),
+        ),
       ],
     );
   }
