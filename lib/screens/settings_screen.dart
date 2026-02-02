@@ -287,6 +287,8 @@ class SettingsScreen extends StatelessWidget {
                     }
                   },
                 ),
+                    ],
+                  ),
               ),
               const Divider(),
 
