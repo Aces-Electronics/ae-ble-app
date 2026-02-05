@@ -5,13 +5,14 @@ import 'dart:typed_data';
 
 import 'package:ae_ble_app/models/smart_shunt.dart';
 import 'package:ae_ble_app/models/temp_sensor.dart';
+import 'package:ae_ble_app/models/tracker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum DeviceType { smartShunt, tempSensor, unknown }
+enum DeviceType { smartShunt, tempSensor, tracker, unknown }
 
 class BleService extends ChangeNotifier {
   static const platform = MethodChannel('au.com.aceselectronics.sss/car');
@@ -29,8 +30,13 @@ class BleService extends ChangeNotifier {
       StreamController<TempSensor>.broadcast();
   Stream<TempSensor> get tempSensorStream => _tempSensorController.stream;
 
+  final StreamController<Tracker> _trackerController =
+      StreamController<Tracker>.broadcast();
+  Stream<Tracker> get trackerStream => _trackerController.stream;
+
   SmartShunt _currentSmartShunt = SmartShunt();
   TempSensor _currentTempSensor = TempSensor();
+  Tracker _currentTracker = Tracker();
   DeviceType _currentDeviceType = DeviceType.unknown;
 
   DeviceType get currentDeviceType => _currentDeviceType;
@@ -41,6 +47,7 @@ class BleService extends ChangeNotifier {
   static const int _historyWindowSize = 300; // 5 minute window at 1Hz roughly
   SmartShunt get currentSmartShunt => _currentSmartShunt;
   TempSensor get currentTempSensor => _currentTempSensor;
+  Tracker get currentTracker => _currentTracker;
   BluetoothDevice? _device;
   BluetoothCharacteristic? _loadControlCharacteristic;
   BluetoothCharacteristic? _setSocCharacteristic;
@@ -181,11 +188,13 @@ class BleService extends ChangeNotifier {
       // Reset state to empty/loading to prevent stale data on next connect
       _currentSmartShunt = SmartShunt();
       _currentTempSensor = TempSensor();
+      _currentTracker = Tracker();
       _currentDeviceType = DeviceType.unknown;
       _currentHistory.clear();
       _isFetchingMetadata = false; // Reset metadata fetching flag
       _smartShuntController.add(_currentSmartShunt);
       _tempSensorController.add(_currentTempSensor);
+      _trackerController.add(_currentTracker);
     }
   }
 
@@ -278,11 +287,14 @@ class BleService extends ChangeNotifier {
       print('Service: ${service.uuid}');
       if (service.uuid == SMART_SHUNT_SERVICE_UUID ||
           service.uuid == OTA_SERVICE_UUID ||
-          service.uuid == TEMP_SENSOR_SERVICE_UUID) {
+          service.uuid == TEMP_SENSOR_SERVICE_UUID ||
+          service.uuid == TRACKER_SERVICE_UUID) {
         if (service.uuid == SMART_SHUNT_SERVICE_UUID) {
           _currentDeviceType = DeviceType.smartShunt;
         } else if (service.uuid == TEMP_SENSOR_SERVICE_UUID) {
           _currentDeviceType = DeviceType.tempSensor;
+        } else if (service.uuid == TRACKER_SERVICE_UUID) {
+          _currentDeviceType = DeviceType.tracker;
         }
         notifyListeners(); // Update UI immediately
         print('Found matching service: ${_currentDeviceType}');
@@ -309,6 +321,8 @@ class BleService extends ChangeNotifier {
                 value,
               ) async {
                 await _updateSmartShuntData(characteristic.uuid, value);
+                // Also try tracker update logic (simpler would be separte function, but keeping structure)
+                _updateTrackerData(characteristic.uuid, value);
               });
 
               // Keep track of subscriptions if needed, or rely on FBP cleanup
@@ -363,8 +377,11 @@ class BleService extends ChangeNotifier {
               characteristic.uuid == CLOUD_CONFIG_UUID ||
               characteristic.uuid == CLOUD_STATUS_UUID ||
               characteristic.uuid == WIFI_SSID_CHAR_UUID ||
+              characteristic.uuid == TRACKER_WIFI_SSID_UUID ||
               characteristic.uuid == MQTT_BROKER_CHAR_UUID ||
+              characteristic.uuid == TRACKER_MQTT_BROKER_UUID ||
               characteristic.uuid == MQTT_USER_CHAR_UUID ||
+              characteristic.uuid == TRACKER_MQTT_USER_UUID ||
               characteristic.uuid == PAIRING_CHAR_UUID) {
             try {
               if (characteristic.uuid == ERROR_STATE_UUID) {
@@ -390,9 +407,11 @@ class BleService extends ChangeNotifier {
             _setLowVoltageDisconnectDelayCharacteristic = characteristic;
           } else if (characteristic.uuid == DEVICE_NAME_SUFFIX_UUID) {
             _setDeviceNameSuffixCharacteristic = characteristic;
-          } else if (characteristic.uuid == WIFI_SSID_CHAR_UUID) {
+          } else if (characteristic.uuid == WIFI_SSID_CHAR_UUID ||
+              characteristic.uuid == TRACKER_WIFI_SSID_UUID) {
             _wifiSsidCharacteristic = characteristic;
-          } else if (characteristic.uuid == WIFI_PASS_CHAR_UUID) {
+          } else if (characteristic.uuid == WIFI_PASS_CHAR_UUID ||
+              characteristic.uuid == TRACKER_WIFI_PASS_UUID) {
             _wifiPassCharacteristic = characteristic;
           } else if (characteristic.uuid == CURRENT_VERSION_UUID) {
             _currentVersionCharacteristic = characteristic;
@@ -421,11 +440,14 @@ class BleService extends ChangeNotifier {
             _cloudConfigCharacteristic = characteristic;
           } else if (characteristic.uuid == CLOUD_STATUS_UUID) {
             _cloudStatusCharacteristic = characteristic;
-          } else if (characteristic.uuid == MQTT_BROKER_CHAR_UUID) {
+          } else if (characteristic.uuid == MQTT_BROKER_CHAR_UUID ||
+              characteristic.uuid == TRACKER_MQTT_BROKER_UUID) {
             _mqttBrokerCharacteristic = characteristic;
-          } else if (characteristic.uuid == MQTT_USER_CHAR_UUID) {
+          } else if (characteristic.uuid == MQTT_USER_CHAR_UUID ||
+              characteristic.uuid == TRACKER_MQTT_USER_UUID) {
             _mqttUserCharacteristic = characteristic;
-          } else if (characteristic.uuid == MQTT_PASS_CHAR_UUID) {
+          } else if (characteristic.uuid == MQTT_PASS_CHAR_UUID ||
+              characteristic.uuid == TRACKER_MQTT_PASS_UUID) {
             _mqttPassCharacteristic = characteristic;
           }
         }
@@ -1457,5 +1479,39 @@ class BleService extends ChangeNotifier {
       }
     }
     print('Could not find device to reconnect to.');
+  }
+
+  void _updateTrackerData(Guid uuid, List<int> value) {
+    if (_currentDeviceType != DeviceType.tracker) return;
+    
+    try {
+      String data = utf8.decode(value);
+      if (uuid == TRACKER_GPS_DATA_UUID) {
+        // "lat,lng,speed,sats"
+        List<String> parts = data.split(',');
+        if (parts.length >= 4) {
+          _currentTracker = _currentTracker.copyWith(
+            latitude: double.tryParse(parts[0]),
+            longitude: double.tryParse(parts[1]),
+            speed: double.tryParse(parts[2]),
+            satellites: int.tryParse(parts[3]),
+          );
+          _trackerController.add(_currentTracker);
+        }
+      } else if (uuid == TRACKER_STATUS_UUID) {
+        // "volts,gsmSignal,status"
+        List<String> parts = data.split(',');
+        if (parts.length >= 3) {
+          _currentTracker = _currentTracker.copyWith(
+            batteryVoltage: double.tryParse(parts[0]),
+            gsmSignal: int.tryParse(parts[1]),
+            gsmStatus: parts[2],
+          );
+          _trackerController.add(_currentTracker);
+        }
+      }
+    } catch (e) {
+      print("Error parsing Tracker data: $e");
+    }
   }
 }

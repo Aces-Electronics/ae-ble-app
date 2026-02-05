@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:ae_ble_app/models/smart_shunt.dart';
 import 'package:ae_ble_app/models/temp_sensor.dart';
+import 'package:ae_ble_app/models/tracker.dart';
 import 'package:ae_ble_app/screens/settings_screen.dart';
+import 'package:ae_ble_app/screens/tracker_settings_screen.dart';
 import 'package:ae_ble_app/services/ble_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -103,16 +105,27 @@ class _DeviceScreenState extends State<DeviceScreen> {
             icon: const Icon(Icons.settings),
             tooltip: 'Settings',
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
+              if (bleService.currentDeviceType == DeviceType.tracker) {
+                  Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TrackerSettingsScreen()),
+                );
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                );
+              }
             },
           ),
         ],
       ),
-      body: bleService.currentDeviceType == DeviceType.tempSensor
-          ? _buildTempSensorBody(bleService)
+      body: bleService.currentDeviceType == DeviceType.unknown 
+         ? const Center(child: CircularProgressIndicator()) 
+         : bleService.currentDeviceType == DeviceType.tracker
+              ? _buildTrackerBody(bleService)
+              : bleService.currentDeviceType == DeviceType.tempSensor
+                  ? _buildTempSensorBody(bleService)
           : Stack(
               children: [
                 SafeArea(
@@ -664,5 +677,48 @@ class _DeviceScreenState extends State<DeviceScreen> {
       isWarning: !connected,
       overrideColor: connected ? Colors.green : Colors.grey,
     );
+  }
+
+  Widget _buildTrackerBody(BleService bleService) {
+      return StreamBuilder<Tracker>(
+      stream: bleService.trackerStream,
+      initialData: bleService.currentTracker,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          final tracker = snapshot.data!;
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                const Icon(Icons.location_on, size: 80, color: Colors.blue),
+                Text(
+                    "GPS: ${tracker.satellites} Sats",
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                 Text(
+                    "${tracker.latitude.toStringAsFixed(6)}, ${tracker.longitude.toStringAsFixed(6)}",
+                    style: const TextStyle(fontSize: 18),
+                ),
+                const SizedBox(height: 20),
+                GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(8.0),
+                    crossAxisCount: 2,
+                    childAspectRatio: 1.5,
+                    children: [
+                        _buildInfoTile(context, "Speed", "${tracker.speed} km/h", Icons.speed),
+                        _buildInfoTile(context, "Battery", "${tracker.batteryVoltage.toStringAsFixed(2)} V", Icons.battery_std),
+                        _buildInfoTile(context, "Signal", "${tracker.gsmSignal}", Icons.signal_cell_tower),
+                        _buildInfoTile(context, "Status", tracker.gsmStatus, Icons.info_outline),
+                    ],
+                )
+              ],
+            ),
+          );
+        } else {
+             return const Center(child: CircularProgressIndicator());
+        }
+      });
   }
 }
