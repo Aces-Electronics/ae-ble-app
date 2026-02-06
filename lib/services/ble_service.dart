@@ -1507,13 +1507,22 @@ class BleService extends ChangeNotifier {
           _trackerController.add(_currentTracker);
         }
       } else if (uuid == TRACKER_STATUS_UUID) {
-        // "volts,gsmSignal,status"
+        // "volts,soc,rssi,status"
         List<String> parts = data.split(',');
-        if (parts.length >= 3) {
+        if (parts.length >= 4) {
+          _currentTracker = _currentTracker.copyWith(
+            batteryVoltage: double.tryParse(parts[0]),
+            batterySoc: int.tryParse(parts[1]),
+            gsmSignal: int.tryParse(parts[2]),
+            gsmStatus: parts.sublist(3).join(','), // Rejoin status if it contained commas
+          );
+          _trackerController.add(_currentTracker);
+        } else if (parts.length >= 3) {
+          // Legacy support for older firmwares
           _currentTracker = _currentTracker.copyWith(
             batteryVoltage: double.tryParse(parts[0]),
             gsmSignal: int.tryParse(parts[1]),
-            gsmStatus: parts[2],
+            gsmStatus: parts.sublist(2).join(','),
           );
           _trackerController.add(_currentTracker);
         }

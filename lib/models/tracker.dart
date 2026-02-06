@@ -6,6 +6,7 @@ class Tracker {
   final double speed;
   final int satellites;
   final double batteryVoltage;
+  final int batterySoc;
   final int gsmSignal;
   final String gsmStatus;
   final String wifiSsid;
@@ -20,6 +21,7 @@ class Tracker {
     this.speed = 0.0,
     this.satellites = 0,
     this.batteryVoltage = 0.0,
+    this.batterySoc = 0,
     this.gsmSignal = 0,
     this.gsmStatus = "Unknown",
     this.wifiSsid = "",
@@ -34,6 +36,7 @@ class Tracker {
     double? speed,
     int? satellites,
     double? batteryVoltage,
+    int? batterySoc,
     int? gsmSignal,
     String? gsmStatus,
     String? wifiSsid,
@@ -47,6 +50,7 @@ class Tracker {
       speed: speed ?? this.speed,
       satellites: satellites ?? this.satellites,
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
+      batterySoc: batterySoc ?? this.batterySoc,
       gsmSignal: gsmSignal ?? this.gsmSignal,
       gsmStatus: gsmStatus ?? this.gsmStatus,
       wifiSsid: wifiSsid ?? this.wifiSsid,

@@ -698,9 +698,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 const SizedBox(height: 20),
                 
                 // Status Card
+                // Status Card (Dark theme consistent)
                 if (!hasFix)
                   Card(
-                    color: Colors.amber.shade100,
+                    // Removed whitish background, matches theme
                     margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     elevation: 4,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -710,24 +711,24 @@ class _DeviceScreenState extends State<DeviceScreen> {
                         children: [
                           const SizedBox(height: 8),
                           CircularProgressIndicator(
-                            color: Colors.orange.shade800, 
+                            color: Colors.orange.shade500, 
                             strokeWidth: 6,
                           ),
                           const SizedBox(height: 24),
-                          Text(
+                          const Text(
                               "Waiting for GPS Fix...",
                               style: TextStyle(
                                   fontSize: 22, 
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.orange.shade900
+                                  color: Colors.orange
                               ),
                           ),
                           const SizedBox(height: 12),
                           Text(
                               "Move outdoors for better signal.\nSatellites: $safeSats",
                               textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  color: Colors.orange.shade900,
+                              style: const TextStyle(
+                                  color: Colors.grey,
                                   fontSize: 16,
                                   height: 1.5,
                               ),
@@ -740,7 +741,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
                 if (hasFix)
                  Card(
-                    color: Colors.green.shade50,
+                    // Removed whitish background, matches theme
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -748,9 +749,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                             children: [
                                 const Icon(Icons.gps_fixed, size: 50, color: Colors.green),
                                 const SizedBox(height: 8),
-                                Text(
+                                const Text(
                                     "GPS Locked",
-                                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green.shade900),
+                                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -777,8 +778,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     crossAxisSpacing: 8.0,
                     children: [
                         _buildInfoTile(context, "Speed", "${tracker.speed} km/h", Icons.speed),
-                        _buildInfoTile(context, "Battery", "${tracker.batteryVoltage.toStringAsFixed(2)} V", Icons.battery_std, 
-                            overrideColor: _getVoltageColor(tracker.batteryVoltage)),
+                        _buildInfoTile(context, "Battery", "${tracker.batterySoc}%", Icons.battery_std, 
+                            overrideColor: _getSocColor(tracker.batterySoc.toDouble())),
                         _buildInfoTile(context, "Signal", _formatSignal(tracker.gsmSignal), Icons.signal_cellular_alt,
                             overrideColor: _getSignalColor(tracker.gsmSignal)),
                         _buildInfoTile(context, "Network", _formatNetworkStatus(tracker.gsmStatus), Icons.public),
