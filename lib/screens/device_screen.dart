@@ -687,62 +687,84 @@ class _DeviceScreenState extends State<DeviceScreen> {
         if (snapshot.hasData) {
           final tracker = snapshot.data!;
           // Logic for "fix": >3 satellites or non-zero coord, OR explicitly if we had a flag
-          final hasFix = tracker.satellites >= 3 && (tracker.latitude != 0.0 || tracker.longitude != 0.0);
-          final sats = tracker.satellites < 0 ? 0 : tracker.satellites;
+          // Fix Logic: Valid coordinates OR >3 sats. (Sanitize negative sats from old FW)
+          final bool hasCoordinates = tracker.latitude != 0.0 && tracker.longitude != 0.0;
+          final int safeSats = tracker.satellites < 0 ? 0 : tracker.satellites;
+          final bool hasFix = safeSats >= 3 || hasCoordinates;
           
           return SingleChildScrollView(
             child: Column(
               children: [
                 const SizedBox(height: 20),
                 
-                // Friendly Status Card
-                Card(
-                    color: hasFix ? Colors.green.shade50 : Colors.orange.shade50,
-                    margin: const EdgeInsets.all(16),
+                // Status Card
+                if (!hasFix)
+                  Card(
+                    color: Colors.amber.shade100,
+                    margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 8),
+                          CircularProgressIndicator(
+                            color: Colors.orange.shade800, 
+                            strokeWidth: 6,
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                              "Waiting for GPS Fix...",
+                              style: TextStyle(
+                                  fontSize: 22, 
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange.shade900
+                              ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                              "Move outdoors for better signal.\nSatellites: $safeSats",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  color: Colors.orange.shade900,
+                                  fontSize: 16,
+                                  height: 1.5,
+                              ),
+                          ),
+                          const SizedBox(height: 8),
+                        ]
+                      ),
+                    ),
+                  ),
+
+                if (hasFix)
+                 Card(
+                    color: Colors.green.shade50,
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
                             children: [
-                                Icon(
-                                    hasFix ? Icons.gps_fixed : Icons.gps_not_fixed, 
-                                    size: 60, 
-                                    color: hasFix ? Colors.green : Colors.orange
-                                ),
-                                const SizedBox(height: 10),
+                                const Icon(Icons.gps_fixed, size: 50, color: Colors.green),
+                                const SizedBox(height: 8),
                                 Text(
-                                    hasFix ? "GPS Locked" : "Waiting for GPS Fix...",
-                                    style: TextStyle(
-                                        fontSize: 20, 
-                                        fontWeight: FontWeight.bold,
-                                        color: hasFix ? Colors.green.shade900 : Colors.orange.shade900,
-                                    ),
+                                    "GPS Locked",
+                                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green.shade900),
                                 ),
-                                if (!hasFix)
-                                    Padding(
-                                        padding: const EdgeInsets.only(top: 8.0),
-                                        child: Text(
-                                            "Move outdoors for better signal.\nSatellites: $sats",
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                                color: Colors.orange.shade900, // Explicit dark color for contrast
-                                            ),
-                                        ),
-                                    ),
+                                const SizedBox(height: 4),
+                                Text(
+                                    "${tracker.latitude.toStringAsFixed(6)}, ${tracker.longitude.toStringAsFixed(6)}",
+                                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                    "$safeSats Satellites",
+                                    style: const TextStyle(fontSize: 16, color: Colors.grey),
+                                ),
                             ]
-                        ),
-                    ),
-                ),
-
-                if (hasFix) ...[
-                     Text(
-                        "${tracker.latitude.toStringAsFixed(6)}, ${tracker.longitude.toStringAsFixed(6)}",
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                        "$sats Satellites",
-                        style: const TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                ],
+                        )
+                    )
+                 ),
 
                 const SizedBox(height: 20),
                 GridView.count(
