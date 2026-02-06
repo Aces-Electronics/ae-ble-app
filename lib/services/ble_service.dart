@@ -1534,7 +1534,7 @@ class BleService extends ChangeNotifier {
 
   Future<void> setApn(String val) async {
     if (_apnCharacteristic != null) {
-      await _safeWrite(_apnCharacteristic, utf8.encode(val));
+      await _safeWrite(_apnCharacteristic, utf8.encode(val), "APN");
     }
   }
 }
