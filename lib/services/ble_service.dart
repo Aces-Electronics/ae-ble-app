@@ -68,6 +68,7 @@ class BleService extends ChangeNotifier {
   BluetoothCharacteristic? _cloudStatusCharacteristic;
   BluetoothCharacteristic? _mqttBrokerCharacteristic;
   BluetoothCharacteristic? _mqttUserCharacteristic;
+  BluetoothCharacteristic? _apnCharacteristic;
   BluetoothCharacteristic? _mqttPassCharacteristic;
 
   // Temp Sensor Specific
@@ -382,6 +383,7 @@ class BleService extends ChangeNotifier {
               characteristic.uuid == TRACKER_MQTT_BROKER_UUID ||
               characteristic.uuid == MQTT_USER_CHAR_UUID ||
               characteristic.uuid == TRACKER_MQTT_USER_UUID ||
+              characteristic.uuid == TRACKER_APN_UUID ||
               characteristic.uuid == PAIRING_CHAR_UUID) {
             try {
               if (characteristic.uuid == ERROR_STATE_UUID) {
@@ -391,7 +393,11 @@ class BleService extends ChangeNotifier {
                 print("Reading initial value for ${characteristic.uuid}...");
                 final val = await characteristic.read();
                 print("Read value for ${characteristic.uuid}: $val");
-                await _updateSmartShuntData(characteristic.uuid, val);
+                if (_currentDeviceType == DeviceType.tracker) {
+                   _updateTrackerData(characteristic.uuid, val);
+                } else {
+                   await _updateSmartShuntData(characteristic.uuid, val);
+                }
               }
             } catch (e) {
               print("Error reading ${characteristic.uuid}: $e");
@@ -449,6 +455,8 @@ class BleService extends ChangeNotifier {
           } else if (characteristic.uuid == MQTT_PASS_CHAR_UUID ||
               characteristic.uuid == TRACKER_MQTT_PASS_UUID) {
             _mqttPassCharacteristic = characteristic;
+          } else if (characteristic.uuid == TRACKER_APN_UUID) {
+            _apnCharacteristic = characteristic;
           }
         }
       }
@@ -1509,9 +1517,24 @@ class BleService extends ChangeNotifier {
           );
           _trackerController.add(_currentTracker);
         }
+      } else if (uuid == TRACKER_APN_UUID) {
+          _currentTracker = _currentTracker.copyWith(apn: data);
+          _trackerController.add(_currentTracker);
+      } else if (uuid == TRACKER_WIFI_SSID_UUID) {
+          _currentTracker = _currentTracker.copyWith(wifiSsid: data);
+      } else if (uuid == TRACKER_MQTT_BROKER_UUID) {
+          _currentTracker = _currentTracker.copyWith(mqttBroker: data);
+      } else if (uuid == TRACKER_MQTT_USER_UUID) {
+          _currentTracker = _currentTracker.copyWith(mqttUser: data);
       }
     } catch (e) {
       print("Error parsing Tracker data: $e");
+    }
+  }
+
+  Future<void> setApn(String val) async {
+    if (_apnCharacteristic != null) {
+      await _safeWrite(_apnCharacteristic, utf8.encode(val));
     }
   }
 }

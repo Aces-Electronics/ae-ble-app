@@ -12,6 +12,8 @@ class Tracker {
   final String mqttBroker;
   final String mqttUser;
   
+  final String apn;
+  
   Tracker({
     this.latitude = 0.0,
     this.longitude = 0.0,
@@ -23,6 +25,7 @@ class Tracker {
     this.wifiSsid = "",
     this.mqttBroker = "",
     this.mqttUser = "",
+    this.apn = "",
   });
 
   Tracker copyWith({
@@ -36,6 +39,7 @@ class Tracker {
     String? wifiSsid,
     String? mqttBroker,
     String? mqttUser,
+    String? apn,
   }) {
     return Tracker(
       latitude: latitude ?? this.latitude,
@@ -48,6 +52,7 @@ class Tracker {
       wifiSsid: wifiSsid ?? this.wifiSsid,
       mqttBroker: mqttBroker ?? this.mqttBroker,
       mqttUser: mqttUser ?? this.mqttUser,
+      apn: apn ?? this.apn,
     );
   }
 }
@@ -61,6 +66,7 @@ final Guid TRACKER_GEOFENCE_UUID = Guid("beb5483e-36e1-4688-b7f5-ea07361b2032");
 
 final Guid TRACKER_WIFI_SSID_UUID = Guid("beb5483e-36e1-4688-b7f5-ea07361b2640");
 final Guid TRACKER_WIFI_PASS_UUID = Guid("beb5483e-36e1-4688-b7f5-ea07361b2641");
+final Guid TRACKER_APN_UUID = Guid("ae000101-1fb5-459e-8fcc-c5c9c331914b");
 final Guid TRACKER_MQTT_BROKER_UUID = Guid("beb5483e-36e1-4688-b7f5-ea07361b2645");
 final Guid TRACKER_MQTT_USER_UUID = Guid("beb5483e-36e1-4688-b7f5-ea07361b2646");
 final Guid TRACKER_MQTT_PASS_UUID = Guid("beb5483e-36e1-4688-b7f5-ea07361b2647");

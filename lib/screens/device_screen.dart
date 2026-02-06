@@ -686,19 +686,61 @@ class _DeviceScreenState extends State<DeviceScreen> {
       builder: (context, snapshot) {
         if (snapshot.hasData) {
           final tracker = snapshot.data!;
+          // Logic for "fix": >3 satellites or non-zero coord, OR explicitly if we had a flag
+          final hasFix = tracker.satellites >= 3 && (tracker.latitude != 0.0 || tracker.longitude != 0.0);
+          final sats = tracker.satellites < 0 ? 0 : tracker.satellites;
+          
           return SingleChildScrollView(
             child: Column(
               children: [
                 const SizedBox(height: 20),
-                const Icon(Icons.location_on, size: 80, color: Colors.blue),
-                Text(
-                    "GPS: ${tracker.satellites} Sats",
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                
+                // Friendly Status Card
+                Card(
+                    color: hasFix ? Colors.green.shade50 : Colors.orange.shade50,
+                    margin: const EdgeInsets.all(16),
+                    child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                            children: [
+                                Icon(
+                                    hasFix ? Icons.gps_fixed : Icons.gps_not_fixed, 
+                                    size: 60, 
+                                    color: hasFix ? Colors.green : Colors.orange
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                    hasFix ? "GPS Locked" : "Waiting for GPS Fix...",
+                                    style: TextStyle(
+                                        fontSize: 20, 
+                                        fontWeight: FontWeight.bold,
+                                        color: hasFix ? Colors.green.shade900 : Colors.orange.shade900,
+                                    ),
+                                ),
+                                if (!hasFix)
+                                    Padding(
+                                        padding: const EdgeInsets.only(top: 8.0),
+                                        child: Text(
+                                            "Move outdoors for better signal.\nSatellites: $sats",
+                                            textAlign: TextAlign.center,
+                                        ),
+                                    ),
+                            ]
+                        ),
+                    ),
                 ),
-                 Text(
-                    "${tracker.latitude.toStringAsFixed(6)}, ${tracker.longitude.toStringAsFixed(6)}",
-                    style: const TextStyle(fontSize: 18),
-                ),
+
+                if (hasFix) ...[
+                     Text(
+                        "${tracker.latitude.toStringAsFixed(6)}, ${tracker.longitude.toStringAsFixed(6)}",
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                        "$sats Satellites",
+                        style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                ],
+
                 const SizedBox(height: 20),
                 GridView.count(
                     shrinkWrap: true,
@@ -706,10 +748,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     padding: const EdgeInsets.all(8.0),
                     crossAxisCount: 2,
                     childAspectRatio: 1.5,
+                    mainAxisSpacing: 8.0,
+                    crossAxisSpacing: 8.0,
                     children: [
                         _buildInfoTile(context, "Speed", "${tracker.speed} km/h", Icons.speed),
-                        _buildInfoTile(context, "Battery", "${tracker.batteryVoltage.toStringAsFixed(2)} V", Icons.battery_std),
-                        _buildInfoTile(context, "Signal", "${tracker.gsmSignal}", Icons.signal_cellular_alt),
+                        _buildInfoTile(context, "Battery", "${tracker.batteryVoltage.toStringAsFixed(2)} V", Icons.battery_std, 
+                            overrideColor: _getVoltageColor(tracker.batteryVoltage)),
+                        _buildInfoTile(context, "Signal", "${tracker.gsmSignal} Bars", Icons.signal_cellular_alt,
+                            overrideColor: tracker.gsmSignal > 2 ? Colors.green : Colors.orange),
                         _buildInfoTile(context, "Status", tracker.gsmStatus, Icons.info_outline),
                     ],
                 )

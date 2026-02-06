@@ -11,6 +11,7 @@ class TrackerSettingsScreen extends StatefulWidget {
 
 class _TrackerSettingsScreenState extends State<TrackerSettingsScreen> {
   final TextEditingController _radiusController = TextEditingController();
+  final TextEditingController _apnController = TextEditingController();
   final TextEditingController _wifiSsidController = TextEditingController();
   final TextEditingController _wifiPassController = TextEditingController();
   final TextEditingController _mqttBrokerController = TextEditingController();
@@ -22,6 +23,7 @@ class _TrackerSettingsScreenState extends State<TrackerSettingsScreen> {
     super.initState();
     final bleService = Provider.of<BleService>(context, listen: false);
     final tracker = bleService.currentTracker;
+    _apnController.text = tracker.apn;
     _wifiSsidController.text = tracker.wifiSsid;
     _mqttBrokerController.text = tracker.mqttBroker;
     _mqttUserController.text = tracker.mqttUser;
@@ -60,6 +62,17 @@ class _TrackerSettingsScreenState extends State<TrackerSettingsScreen> {
           const SizedBox(height: 20),
           
           _buildSectionHeader("Connectivity"),
+          TextField(
+            controller: _apnController,
+            decoration: const InputDecoration(labelText: "APN (e.g. hologram)"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              bleService.setApn(_apnController.text);
+            }, 
+            child: const Text("Update APN")
+          ),
+          const Divider(),
           TextField(
             controller: _wifiSsidController,
             decoration: const InputDecoration(labelText: "WiFi SSID"),
