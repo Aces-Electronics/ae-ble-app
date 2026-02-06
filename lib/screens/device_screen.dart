@@ -709,7 +709,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     children: [
                         _buildInfoTile(context, "Speed", "${tracker.speed} km/h", Icons.speed),
                         _buildInfoTile(context, "Battery", "${tracker.batteryVoltage.toStringAsFixed(2)} V", Icons.battery_std),
-                        _buildInfoTile(context, "Signal", "${tracker.gsmSignal}", Icons.signal_cell_tower),
+                        _buildInfoTile(context, "Signal", "${tracker.gsmSignal}", Icons.signal_cellular_alt),
                         _buildInfoTile(context, "Status", tracker.gsmStatus, Icons.info_outline),
                     ],
                 )
