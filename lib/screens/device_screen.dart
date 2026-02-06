@@ -723,6 +723,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                         child: Text(
                                             "Move outdoors for better signal.\nSatellites: $sats",
                                             textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                                color: Colors.orange.shade900, // Explicit dark color for contrast
+                                            ),
                                         ),
                                     ),
                             ]
@@ -754,9 +757,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                         _buildInfoTile(context, "Speed", "${tracker.speed} km/h", Icons.speed),
                         _buildInfoTile(context, "Battery", "${tracker.batteryVoltage.toStringAsFixed(2)} V", Icons.battery_std, 
                             overrideColor: _getVoltageColor(tracker.batteryVoltage)),
-                        _buildInfoTile(context, "Signal", "${tracker.gsmSignal} Bars", Icons.signal_cellular_alt,
-                            overrideColor: tracker.gsmSignal > 2 ? Colors.green : Colors.orange),
-                        _buildInfoTile(context, "Status", tracker.gsmStatus, Icons.info_outline),
+                        _buildInfoTile(context, "Signal", _formatSignal(tracker.gsmSignal), Icons.signal_cellular_alt,
+                            overrideColor: _getSignalColor(tracker.gsmSignal)),
+                        _buildInfoTile(context, "Network", _formatNetworkStatus(tracker.gsmStatus), Icons.public),
                     ],
                 )
               ],
@@ -766,5 +769,48 @@ class _DeviceScreenState extends State<DeviceScreen> {
              return const Center(child: CircularProgressIndicator());
         }
       });
+  }
+
+  String _formatSignal(int csq) {
+      if (csq == 99 || csq == 0) return "Unknown";
+      if (csq >= 20) return "Good ($csq)";
+      if (csq >= 10) return "Average ($csq)";
+      return "Low ($csq)";
+  }
+
+  Color _getSignalColor(int csq) {
+      if (csq == 99 || csq == 0) return Colors.grey;
+      if (csq >= 20) return Colors.green;
+      if (csq >= 10) return Colors.orange;
+      return Colors.red;
+  }
+
+  String _formatNetworkStatus(String status) {
+      // Input format: "Searching GPS... Net: X" or just "Net: X" or any string
+      // Extract numeric status if present
+      final regExp = RegExp(r'Net:\s*(-?\d+)');
+      final match = regExp.firstMatch(status);
+      
+      if (match != null) {
+          String codeStr = match.group(1)!;
+          int code = int.tryParse(codeStr) ?? -1;
+          
+          switch(code) {
+              case 0: return "Not Registered";
+              case 1: return "Registered (Home)";
+              case 2: return "Searching...";
+              case 3: return "Registration Denied";
+              case 4: return "Unknown";
+              case 5: return "Roaming";
+              case -1: return "Initializing...";
+              default: return "Status: $code";
+          }
+      }
+      
+      // Fallback if no specific format found, try to clean it up
+      if (status.contains("Searching GPS")) return "Searching...";
+      if (status.contains("GPS Fix")) return "GPS Locked";
+      
+      return status; // Return raw if all else fails
   }
 }
