@@ -784,7 +784,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                             overrideColor: _getSignalColor(tracker.gsmSignal)),
                         _buildInfoTile(context, "Network", _formatNetworkStatus(tracker.gsmStatus), Icons.public,
                             overrideColor: _getNetworkColor(tracker.gsmStatus)),
-                        _buildInfoTile(context, "GPS Accuracy", tracker.hasFix ? "${tracker.hdop.toStringAsFixed(2)} HDOP" : "--", Icons.gps_fixed),
+                        _buildInfoTile(context, "GPS Accuracy", hasFix ? "${tracker.hdop.toStringAsFixed(2)} HDOP" : "--", Icons.gps_fixed),
                     ],
                 )
               ],
