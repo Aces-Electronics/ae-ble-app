@@ -1495,9 +1495,19 @@ class BleService extends ChangeNotifier {
     try {
       String data = utf8.decode(value);
       if (uuid == TRACKER_GPS_DATA_UUID) {
-        // "lat,lng,speed,sats"
+        // "lat,lng,speed,sats,hdop"
         List<String> parts = data.split(',');
-        if (parts.length >= 4) {
+        if (parts.length >= 5) {
+          _currentTracker = _currentTracker.copyWith(
+            latitude: double.tryParse(parts[0]),
+            longitude: double.tryParse(parts[1]),
+            speed: double.tryParse(parts[2]),
+            satellites: int.tryParse(parts[3]),
+            hdop: double.tryParse(parts[4]),
+          );
+          _trackerController.add(_currentTracker);
+        } else if (parts.length >= 4) {
+          // Legacy support
           _currentTracker = _currentTracker.copyWith(
             latitude: double.tryParse(parts[0]),
             longitude: double.tryParse(parts[1]),

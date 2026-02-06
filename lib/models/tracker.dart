@@ -8,6 +8,7 @@ class Tracker {
   final double batteryVoltage;
   final int batterySoc;
   final int gsmSignal;
+  final double hdop; // Added
   final String gsmStatus;
   final String wifiSsid;
   final String mqttBroker;
@@ -23,6 +24,7 @@ class Tracker {
     this.batteryVoltage = 0.0,
     this.batterySoc = 0,
     this.gsmSignal = 0,
+    this.hdop = 0.0,
     this.gsmStatus = "Unknown",
     this.wifiSsid = "",
     this.mqttBroker = "",
@@ -38,6 +40,7 @@ class Tracker {
     double? batteryVoltage,
     int? batterySoc,
     int? gsmSignal,
+    double? hdop,
     String? gsmStatus,
     String? wifiSsid,
     String? mqttBroker,
@@ -52,6 +55,7 @@ class Tracker {
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
       batterySoc: batterySoc ?? this.batterySoc,
       gsmSignal: gsmSignal ?? this.gsmSignal,
+      hdop: hdop ?? this.hdop,
       gsmStatus: gsmStatus ?? this.gsmStatus,
       wifiSsid: wifiSsid ?? this.wifiSsid,
       mqttBroker: mqttBroker ?? this.mqttBroker,

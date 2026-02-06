@@ -759,7 +759,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                                 ),
                                 Text(
-                                    "$safeSats Satellites",
+                                    "$safeSats Satellites | HDOP: ${tracker.hdop.toStringAsFixed(2)}",
                                     style: const TextStyle(fontSize: 16, color: Colors.grey),
                                 ),
                             ]
@@ -782,7 +782,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                             overrideColor: _getSocColor(tracker.batterySoc.toDouble())),
                         _buildInfoTile(context, "Signal", _formatSignal(tracker.gsmSignal), Icons.signal_cellular_alt,
                             overrideColor: _getSignalColor(tracker.gsmSignal)),
-                        _buildInfoTile(context, "Network", _formatNetworkStatus(tracker.gsmStatus), Icons.public),
+                        _buildInfoTile(context, "Network", _formatNetworkStatus(tracker.gsmStatus), Icons.public,
+                            overrideColor: _getNetworkColor(tracker.gsmStatus)),
+                        _buildInfoTile(context, "GPS Accuracy", tracker.hasFix ? "${tracker.hdop.toStringAsFixed(2)} HDOP" : "--", Icons.gps_fixed),
                     ],
                 )
               ],
@@ -834,6 +836,13 @@ class _DeviceScreenState extends State<DeviceScreen> {
       if (status.contains("Searching GPS")) return "Searching...";
       if (status.contains("GPS Fix")) return "GPS Locked";
       
-      return status; // Return raw if all else fails
+      return status; 
+  }
+
+  Color _getNetworkColor(String status) {
+      if (status.contains("Registered")) return Colors.green;
+      if (status.contains("Searching")) return Colors.orange;
+      if (status.contains("Denied")) return Colors.red;
+      return Colors.grey;
   }
 }
